@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login - flash-connector</title>
+    <script>
+      (() => {
+        try {
+          const storedTheme = localStorage.getItem("fc-theme");
+          if (storedTheme === "dark") {
+            document.documentElement.setAttribute("data-theme", "dark");
+          } else if (!storedTheme && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.setAttribute("data-theme", "dark");
+          }
+        } catch (_err) {}
+      })();
+    </script>
+    <link
+      id="theme-favicon"
+      rel="icon"
+      type="image/svg+xml"
+      href="/static/favicon.svg?v=20260305-6"
+      data-icon-light="/static/favicon.svg?v=20260305-6"
+      data-icon-dark="/static/favicon-dark.svg?v=20260305-1"
+    />
+    <link rel="stylesheet" href="/static/style.css?v=20260305-2" />
+  </head>
+  <body class="auth-page">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-brand-row">
+          <span class="brand-icon auth-brand-icon">
+            <img
+              src="/static/logo-fc.svg?v=20260305-6"
+              alt="flash-connector logo"
+              class="brand-logo"
+              data-logo-light="/static/logo-fc.svg?v=20260305-6"
+              data-logo-dark="/static/logo-fc-dark.svg?v=20260305-1"
+            />
+          </span>
+          <span class="auth-brand-name">flash-connector</span>
+        </div>
+        <p class="kicker">flash-connector console</p>
+        <h1>Sign In</h1>
+        <p class="muted">Use Keycloak OIDC for production or Local Test Login for local development.</p>
+        {% if error %}<div class="flash warn">{{ error }}</div>{% endif %}
+        {% if oidc_enabled %}
+        <a class="btn" href="/login/start">Continue to Keycloak</a>
+        <p class="small muted">Issuer: {{ oidc_issuer_url }}</p>
+        {% else %}
+        <div class="flash warn">
+          OIDC is not configured. Set <code>OIDC_ISSUER_URL</code> and <code>OIDC_CLIENT_ID</code> in environment.
+        </div>
+        {% endif %}
+        {% if local_auth_enabled %}
+        <hr />
+        <h3>Local Test Login</h3>
+        <p class="small muted">Use this for local development only. Use user email + password (or bootstrap credentials from <code>LOCAL_AUTH_USERNAME</code>/<code>LOCAL_AUTH_PASSWORD</code>).</p>
+        <form method="post" action="/login/local" class="stack">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <label class="label">Email or bootstrap username</label>
+          <input type="text" name="username" value="{{ local_auth_username }}" required />
+          <label class="label">Password</label>
+          <input type="password" name="password" value="test" required />
+          <button type="submit" class="btn btn-secondary">Sign in locally</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    <script>
+      (() => {
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        const logos = document.querySelectorAll("img.brand-logo[data-logo-light][data-logo-dark]");
+        logos.forEach((img) => {
+          const light = img.getAttribute("data-logo-light") || "";
+          const dark = img.getAttribute("data-logo-dark") || light;
+          img.setAttribute("src", isDark ? dark : light);
+        });
+        const favicon = document.getElementById("theme-favicon");
+        if (favicon) {
+          const light = favicon.getAttribute("data-icon-light") || "";
+          const dark = favicon.getAttribute("data-icon-dark") || light;
+          favicon.setAttribute("href", isDark ? dark : light);
+        }
+      })();
+    </script>
+  </body>
+</html>

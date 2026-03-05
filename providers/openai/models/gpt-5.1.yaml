@@ -1,0 +1,38 @@
+model: gpt-5.1
+display_name: GPT-5.1
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: GPT-5.1 generation model. Supports optional compatibility sampling mode.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 2048
+    description: Output token ceiling.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [none, minimal, low, medium, high]
+    default: medium
+    description: Reasoning depth control.
+    increase_effect: Better quality for complex tasks.
+    decrease_effect: Lower latency/cost.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.2
+    description: Supported only when using compatible reasoning mode (for example effort=none).
+  top_p:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 1
+    description: Supported only when using compatible reasoning mode.

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <h2>User Management</h2>
+  <p class="muted small">Create tenant users for local/password login. OIDC users continue to work as before.</p>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>Create User</h3>
+    <form method="post" action="/users/create" class="stack">
+      <label class="label">Email</label>
+      <input type="email" name="email" placeholder="dev@company.com" required />
+      <label class="label">Display name</label>
+      <input type="text" name="display_name" placeholder="Developer" />
+      <label class="label">Role</label>
+      <select name="role">
+        {% if session_user.role == 'owner' %}
+        <option value="owner">owner</option>
+        {% endif %}
+        <option value="admin">admin</option>
+        <option value="dev" selected>dev</option>
+        <option value="viewer">viewer</option>
+      </select>
+      <label class="label">Password</label>
+      <input type="password" name="password" minlength="8" required />
+      <button class="btn" type="submit">Create User</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>How Local Login Works</h3>
+    <ul class="small muted">
+      <li>Go to <code>/login</code>, use Local Test Login.</li>
+      <li>Use user email as username and the configured password.</li>
+      <li>Bootstrap env credentials still work for owner recovery.</li>
+    </ul>
+  </section>
+</div>
+
+<section class="card">
+  <h3>Users</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Created</th>
+          <th>Last login</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+        <tr>
+          <td><code>{{ user.email }}</code></td>
+          <td>{{ user.display_name or "-" }}</td>
+          <td>{{ user.role.value }}</td>
+          <td>{{ user.created_at.strftime("%Y-%m-%d %H:%M") if user.created_at else "-" }}</td>
+          <td>{{ user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else "-" }}</td>
+          <td>
+            <form method="post" action="/users/{{ user.id }}/update" class="inline-form">
+              <input type="text" name="display_name" value="{{ user.display_name or '' }}" placeholder="Display name" />
+              <select name="role">
+                {% if session_user.role == 'owner' %}
+                <option value="owner" {% if user.role.value == 'owner' %}selected{% endif %}>owner</option>
+                {% endif %}
+                <option value="admin" {% if user.role.value == 'admin' %}selected{% endif %}>admin</option>
+                <option value="dev" {% if user.role.value == 'dev' %}selected{% endif %}>dev</option>
+                <option value="viewer" {% if user.role.value == 'viewer' %}selected{% endif %}>viewer</option>
+              </select>
+              <button type="submit" class="btn btn-secondary">Save</button>
+            </form>
+
+            <form method="post" action="/users/{{ user.id }}/password" class="inline-form">
+              <input type="password" name="password" minlength="8" placeholder="New password" required />
+              <button type="submit" class="btn btn-secondary">Reset Password</button>
+            </form>
+
+            {% if user.id != session_user.user_id %}
+            <form method="post" action="/users/{{ user.id }}/delete" class="inline-form">
+              <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not users %}
+        <tr>
+          <td colspan="6" class="muted">No users found.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

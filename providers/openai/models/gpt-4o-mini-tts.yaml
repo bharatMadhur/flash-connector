@@ -1,0 +1,28 @@
+model: gpt-4o-mini-tts
+display_name: GPT-4o Mini TTS
+family: gpt-4o-audio
+category: text_to_speech
+supports_realtime: false
+supports_vision: false
+supports_tools: false
+notes: Text-to-speech model for generated voice output.
+parameters:
+  voice:
+    supported: true
+    type: enum
+    values: [alloy, ash, ballad, coral, sage, verse]
+    default: alloy
+    description: Voice preset for synthesis.
+  format:
+    supported: true
+    type: enum
+    values: [mp3, wav, opus, flac, pcm]
+    default: mp3
+    description: Output audio format.
+  speed:
+    supported: true
+    type: number
+    min: 0.25
+    max: 4.0
+    default: 1.0
+    description: Speech playback speed multiplier.

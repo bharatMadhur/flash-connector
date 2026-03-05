@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <h2>Persona Library</h2>
+  <p class="muted small">Reusable instruction personas for endpoint versions. Keep persona scope tight and predictable.</p>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h2>Personas</h2>
+      <span class="badge info">{{ personas|length }}</span>
+    </div>
+    <p class="muted small">Reusable instruction packs. Attach one persona per endpoint version.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for persona in personas %}
+          <tr>
+            <td>{{ persona.name }}</td>
+            <td>{{ persona.description or "-" }}</td>
+            <td><a href="/personas?persona_id={{ persona.id }}">Edit</a></td>
+          </tr>
+          {% endfor %}
+          {% if not personas %}
+          <tr>
+            <td colspan="3" class="muted">No personas yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Create Persona</h2>
+    <form method="post" action="/personas/create" class="stack">
+      <label class="label">Name</label>
+      <input type="text" name="name" placeholder="Support Specialist" required />
+      <label class="label">Description</label>
+      <input type="text" name="description" placeholder="Handles support chat escalations" />
+      <label class="label">Instructions</label>
+      <textarea name="instructions" placeholder="Tone, policy, and behavior instructions" required></textarea>
+      <label class="label">Style JSON</label>
+      <textarea name="style_json">{"tone":"professional","verbosity":"concise"}</textarea>
+      <button type="submit" class="btn">Create persona</button>
+    </form>
+  </section>
+</div>
+
+{% if selected %}
+<section class="card">
+  <h3>Edit Persona: {{ selected.name }}</h3>
+  <form method="post" action="/personas/{{ selected.id }}/update" class="stack">
+    <label class="label">Name</label>
+    <input type="text" name="name" value="{{ selected.name }}" required />
+    <label class="label">Description</label>
+    <input type="text" name="description" value="{{ selected.description or '' }}" />
+    <label class="label">Instructions</label>
+    <textarea name="instructions" required>{{ selected.instructions }}</textarea>
+    <label class="label">Style JSON</label>
+    <textarea name="style_json">{{ selected.style_json | tojson }}</textarea>
+    <div class="stack-inline">
+      <button type="submit" class="btn">Save persona</button>
+    </div>
+  </form>
+  <form method="post" action="/personas/{{ selected.id }}/delete" class="inline-form">
+    <button type="submit" class="btn btn-danger">Delete persona</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

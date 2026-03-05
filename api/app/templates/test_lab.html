@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="card-head">
+    <h2>Test Lab</h2>
+    <span class="badge info">Guided provider/model comparison</span>
+  </div>
+  <p class="muted small">
+    Run the exact same prompt against selected connections and models, compare usage/cost guidance, then promote a winner in one click.
+  </p>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>Run Comparison</h3>
+    {% if run_error %}
+    <div class="flash warn">{{ run_error }}</div>
+    {% endif %}
+    {% if not ready_connections %}
+    <div class="flash warn">
+      Configure at least one ready provider connection in <a href="/providers">Providers</a>.
+    </div>
+    {% endif %}
+
+    <form method="post" action="/test-lab/run" class="stack" id="test-lab-form">
+      <label class="label">Compare Pack</label>
+      <select name="compare_pack" id="compare-pack-select">
+        {% for pack in compare_packs %}
+        <option value="{{ pack.id }}" {% if selected_compare_pack == pack.id %}selected{% endif %}>{{ pack.label }}{% if pack.id != 'custom' %} - {{ pack.description }}{% endif %}</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">API (optional context source)</label>
+      <select name="endpoint_id">
+        <option value="">No API context</option>
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}" {% if selected_endpoint_id == endpoint.id %}selected{% endif %}>{{ endpoint.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Input text</label>
+      <textarea name="input_text">{{ input_text }}</textarea>
+
+      <label class="label">Metadata JSON (optional)</label>
+      <textarea name="metadata_json">{{ metadata_json_text }}</textarea>
+
+      <label class="label">Comparison Routes</label>
+      <p class="small muted">Each route = provider connection + model.</p>
+      <div id="route-rows" class="stack"></div>
+      <div class="stack-inline">
+        <button type="button" class="btn btn-secondary" id="add-route-row">Add Route</button>
+        <button type="button" class="btn btn-secondary" id="reset-routes">Reset Routes</button>
+      </div>
+
+      <input type="hidden" name="routes_json" id="routes-json-input" value="{{ routes_json | e }}" />
+
+      <button type="submit" class="btn" {% if not ready_connections %}disabled{% endif %}>Run comparison</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Ready Connections</h3>
+    <div class="stack">
+      {% for connection in ready_connections %}
+      <article class="version-card">
+        <strong>{{ connection.name }}</strong>
+        <p class="small muted"><code>{{ connection.provider_slug }}</code> · {{ connection.id }}</p>
+        <p class="small muted">Auth: {{ connection.auth_mode.value }}</p>
+      </article>
+      {% endfor %}
+      {% if not ready_connections %}
+      <p class="small muted">No ready connections available.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+{% if effective_input_text %}
+<section class="card subtle-card">
+  <h3>Effective Input</h3>
+  <pre>{{ effective_input_text }}</pre>
+</section>
+{% endif %}
+
+<section class="card">
+  <div class="card-head">
+    <h3>Comparison Results</h3>
+    <span class="badge info">{{ results|length }} run(s)</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Connection</th>
+          <th>Provider / Model</th>
+          <th>Latency</th>
+          <th>Status</th>
+          <th>Response / Error</th>
+          <th>Usage</th>
+          <th>Advisor</th>
+          <th>Promote</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in results %}
+        <tr>
+          <td><code>{{ row.provider_config_id or "-" }}</code></td>
+          <td><code>{{ row.provider }}/{{ row.model }}</code></td>
+          <td>{{ row.latency_ms }} ms</td>
+          <td>
+            {% if row.error %}
+            <span class="badge warn">failed</span>
+            {% else %}
+            <span class="badge">ok</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if row.error %}
+            <pre>{{ row.error }}</pre>
+            {% else %}
+            <p class="small muted">provider_response_id: <code>{{ row.provider_response_id or "-" }}</code></p>
+            <pre>{{ row.result_text }}</pre>
+            {% endif %}
+          </td>
+          <td><pre>{{ row.usage | tojson(indent=2) if row.usage else "-" }}</pre></td>
+          <td>
+            {% if row.advisor %}
+            <p class="small muted">input {{ row.advisor.input_tokens_estimate }} · output {{ row.advisor.output_tokens_target }}</p>
+            <p class="small muted">cost {% if row.advisor.expected_cost_usd is not none %}${{ '%.8f'|format(row.advisor.expected_cost_usd) }}{% else %}-{% endif %}</p>
+            <p class="small muted">cacheability {{ row.advisor.cacheability_score }} ({{ row.advisor.cacheability_band }})</p>
+            {% if row.advisor.tips %}
+            <p class="small muted">{{ row.advisor.tips[0] }}</p>
+            {% endif %}
+            {% else %}
+            <span class="muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if selected_endpoint_id and not row.error %}
+            <form method="post" action="/test-lab/promote" class="stack">
+              <input type="hidden" name="endpoint_id" value="{{ selected_endpoint_id }}" />
+              <input type="hidden" name="provider_slug" value="{{ row.provider }}" />
+              <input type="hidden" name="model" value="{{ row.model }}" />
+              <input type="hidden" name="provider_config_id" value="{{ row.provider_config_id or '' }}" />
+              <button type="submit" class="btn btn-secondary">Promote Winner</button>
+            </form>
+            {% else %}
+            <span class="muted small">Select API + successful run</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not results %}
+        <tr>
+          <td colspan="8" class="muted">No test runs yet.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  (() => {
+    const providerModels = {{ provider_models_json | safe }};
+    const comparePacks = {{ compare_packs | tojson }};
+    const connectionMeta = {
+      {% for connection in ready_connections %}
+      "{{ connection.id }}": {
+        id: "{{ connection.id }}",
+        name: "{{ connection.name }}",
+        provider_slug: "{{ connection.provider_slug }}"
+      },
+      {% endfor %}
+    };
+    const initialRoutes = {{ routes_json | safe }};
+
+    const routesContainer = document.getElementById("route-rows");
+    const addRouteButton = document.getElementById("add-route-row");
+    const resetRoutesButton = document.getElementById("reset-routes");
+    const routesJsonInput = document.getElementById("routes-json-input");
+    const comparePackSelect = document.getElementById("compare-pack-select");
+    const form = document.getElementById("test-lab-form");
+
+    function buildConnectionOptions(selectedConnectionId) {
+      const entries = Object.values(connectionMeta);
+      return entries.map((entry) => {
+        const selected = entry.id === selectedConnectionId ? "selected" : "";
+        return `<option value="${entry.id}" ${selected}>${entry.name} (${entry.provider_slug})</option>`;
+      }).join("");
+    }
+
+    function modelOptionsForProvider(providerSlug, selectedModel) {
+      const models = providerModels[providerSlug] || [];
+      if (models.length === 0) {
+        return '<option value="">No models available</option>';
+      }
+      return models.map((model) => {
+        const selected = model === selectedModel ? "selected" : "";
+        return `<option value="${model}" ${selected}>${model}</option>`;
+      }).join("");
+    }
+
+    function createRouteRow(route) {
+      const row = document.createElement("div");
+      row.className = "version-card";
+      row.innerHTML = `
+        <div class="grid-2">
+          <div>
+            <label class="label">Connection</label>
+            <select class="route-connection">${buildConnectionOptions(route.provider_config_id || "")}</select>
+          </div>
+          <div>
+            <label class="label">Model</label>
+            <select class="route-model"></select>
+          </div>
+        </div>
+        <div class="stack-inline">
+          <span class="small muted route-provider-label"></span>
+          <button type="button" class="btn btn-secondary route-remove">Remove</button>
+        </div>
+      `;
+
+      const connectionSelect = row.querySelector(".route-connection");
+      const modelSelect = row.querySelector(".route-model");
+      const providerLabel = row.querySelector(".route-provider-label");
+      const removeButton = row.querySelector(".route-remove");
+
+      function refreshModelOptions() {
+        const selectedConnection = connectionMeta[connectionSelect.value];
+        if (!selectedConnection) {
+          modelSelect.innerHTML = '<option value="">No models available</option>';
+          providerLabel.textContent = "Provider: -";
+          return;
+        }
+        providerLabel.textContent = `Provider: ${selectedConnection.provider_slug}`;
+        modelSelect.innerHTML = modelOptionsForProvider(selectedConnection.provider_slug, route.model || "");
+      }
+
+      connectionSelect.addEventListener("change", refreshModelOptions);
+      removeButton.addEventListener("click", () => {
+        row.remove();
+      });
+      refreshModelOptions();
+      return row;
+    }
+
+    function renderRoutes(routes) {
+      routesContainer.innerHTML = "";
+      routes.forEach((route) => {
+        routesContainer.appendChild(createRouteRow(route));
+      });
+      if (routesContainer.children.length === 0) {
+        const firstConnectionId = Object.keys(connectionMeta)[0];
+        if (firstConnectionId) {
+          routesContainer.appendChild(createRouteRow({
+            provider_config_id: firstConnectionId,
+            provider_slug: connectionMeta[firstConnectionId].provider_slug,
+            model: (providerModels[connectionMeta[firstConnectionId].provider_slug] || [])[0] || "",
+          }));
+        }
+      }
+    }
+
+    function collectRoutes() {
+      const rows = routesContainer.querySelectorAll(".version-card");
+      const routes = [];
+      rows.forEach((row) => {
+        const connectionSelect = row.querySelector(".route-connection");
+        const modelSelect = row.querySelector(".route-model");
+        const connection = connectionMeta[connectionSelect.value];
+        const model = modelSelect.value;
+        if (!connection || !model) return;
+        routes.push({
+          provider_slug: connection.provider_slug,
+          provider_config_id: connection.id,
+          model: model
+        });
+      });
+      return routes;
+    }
+
+    function applyPack(packId) {
+      if (packId === "custom") return;
+      const pack = comparePacks.find((item) => item.id === packId);
+      if (!pack) return;
+      const preferredModels = Array.isArray(pack.preferred_models) ? pack.preferred_models : [];
+      const routes = [];
+      const usedProviders = new Set();
+      Object.values(connectionMeta).forEach((connection) => {
+        if (usedProviders.has(connection.provider_slug)) return;
+        const models = providerModels[connection.provider_slug] || [];
+        if (!models.length) return;
+        const preferred = preferredModels.find((item) => models.includes(item));
+        routes.push({
+          provider_slug: connection.provider_slug,
+          provider_config_id: connection.id,
+          model: preferred || models[0]
+        });
+        usedProviders.add(connection.provider_slug);
+      });
+      renderRoutes(routes);
+    }
+
+    addRouteButton?.addEventListener("click", () => {
+      const firstConnectionId = Object.keys(connectionMeta)[0];
+      if (!firstConnectionId) return;
+      const provider = connectionMeta[firstConnectionId].provider_slug;
+      const model = (providerModels[provider] || [])[0] || "";
+      routesContainer.appendChild(createRouteRow({
+        provider_slug: provider,
+        provider_config_id: firstConnectionId,
+        model: model
+      }));
+    });
+
+    resetRoutesButton?.addEventListener("click", () => {
+      applyPack(comparePackSelect.value || "custom");
+    });
+
+    comparePackSelect?.addEventListener("change", () => {
+      applyPack(comparePackSelect.value || "custom");
+    });
+
+    form?.addEventListener("submit", () => {
+      routesJsonInput.value = JSON.stringify(collectRoutes());
+    });
+
+    renderRoutes(initialRoutes);
+  })();
+</script>
+{% endblock %}

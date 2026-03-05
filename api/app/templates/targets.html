@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+{% block content %}
+{% set verified_count = targets | selectattr("is_verified") | list | length %}
+<section class="card hero-card">
+  <div class="card-head">
+    <h2>Optional: Model Deployments</h2>
+    <span class="badge info">{{ targets|length }} total</span>
+  </div>
+  <p class="muted small">
+    Model deployment = provider connection + model/deployment + capability profile. Use this when you want reusable verified deployments across many APIs. For simple flows, create API versions directly in the API page.
+  </p>
+  <div class="chip-row">
+    <span class="chip">Verified: {{ verified_count }}</span>
+    <span class="chip">Unverified: {{ targets|length - verified_count }}</span>
+    <span class="chip">Ready connections: {{ ready_connections|length }}</span>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>{% if selected %}Update Deployment{% else %}Create Deployment{% endif %}</h3>
+    <p class="muted small">Verify runs a real provider call through the selected connection.</p>
+    {% if not can_create_targets and not selected %}
+    <div class="flash warn">
+      Configure and validate at least one provider connection in <a href="/providers">Providers</a>.
+    </div>
+    {% endif %}
+
+    <form id="deployment-form" method="post" action="{% if selected %}/deployments/{{ selected.id }}/update{% else %}/deployments/create{% endif %}" class="stack">
+      <label class="label">Name</label>
+      <input type="text" name="name" value="{{ selected.name if selected else '' }}" placeholder="support-prod-gpt5" required />
+
+      <label class="label">Provider</label>
+      <select name="provider_slug_display" id="provider-select" disabled>
+        {% for provider in catalog %}
+        <option value="{{ provider.slug }}" {% if selected and selected.provider_slug == provider.slug %}selected{% endif %}>{{ provider.name }} ({{ provider.slug }})</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Connection</label>
+      <select name="provider_config_id" id="connection-select" required>
+        {% if not ready_connections %}
+        <option value="">No ready connections</option>
+        {% endif %}
+        {% for config in ready_connections %}
+        <option value="{{ config.id }}" data-provider="{{ config.provider_slug }}" {% if selected and selected.provider_config_id == config.id %}selected{% endif %}>
+          {{ config.name }} ({{ config.provider_slug }}){% if config.is_default %} • default{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Capability profile</label>
+      <select name="capability_profile">
+        <option value="responses_chat" {% if not selected or selected.capability_profile == 'responses_chat' %}selected{% endif %}>responses_chat</option>
+      </select>
+
+      <label class="label">Model</label>
+      <select name="model_identifier" id="model-select" required></select>
+      <label class="check"><input type="checkbox" id="model-custom-toggle" /> Use custom model/deployment id</label>
+      <input type="text" name="model_identifier_custom" id="model-custom-input" value="" placeholder="your-deployment-name" style="display:none;" />
+      <p class="small muted" id="model-meta">Choose a provider connection to load model options and capability notes.</p>
+
+      <div class="card subtle-card" id="model-params-card">
+        <h4>Model Parameters</h4>
+        <div id="model-params-controls" class="stack"></div>
+      </div>
+
+      <input type="hidden" name="params_json" id="params-json-input" value="{}" />
+
+      <label class="check"><input type="checkbox" name="is_active" {% if not selected or selected.is_active %}checked{% endif %} /> Deployment enabled</label>
+      <label class="check"><input type="checkbox" name="verify_now" checked /> Verify after save</label>
+
+      <button type="submit" class="btn" {% if not selected and not can_create_targets %}disabled{% endif %}>
+        {% if selected %}Update deployment{% else %}Create deployment{% endif %}
+      </button>
+    </form>
+    {% if selected %}
+    <p class="small muted">Deployment ID: <code>{{ selected.id }}</code></p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h3>Deployment Registry</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Provider</th>
+            <th>Connection</th>
+            <th>Model</th>
+            <th>Status</th>
+            <th>Verified</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for target in targets %}
+          <tr>
+            <td><a href="/deployments?target_id={{ target.id }}"><strong>{{ target.name }}</strong></a></td>
+            <td><code>{{ target.provider_slug }}</code></td>
+            <td><code>{{ target.provider_config_id or '-' }}</code></td>
+            <td><code>{{ target.model_identifier }}</code></td>
+            <td>{% if target.is_active %}<span class="badge">active</span>{% else %}<span class="badge warn">disabled</span>{% endif %}</td>
+            <td>
+              {% if target.is_verified %}
+              <span class="badge">verified</span>
+              {% else %}
+              <span class="badge warn">not verified</span>
+              {% endif %}
+              {% if target.last_verified_at %}
+              <p class="small muted">{{ target.last_verified_at }}</p>
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" action="/deployments/{{ target.id }}/verify" class="inline-form">
+                <button type="submit" class="btn btn-secondary">Verify</button>
+              </form>
+              {% if session_user.role in ['owner', 'admin'] %}
+              <form method="post" action="/deployments/{{ target.id }}/delete" class="inline-form">
+                <button type="submit" class="btn btn-danger">Delete</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% if target.last_verification_error %}
+          <tr>
+            <td colspan="7"><p class="small muted">Last verify error: {{ target.last_verification_error }}</p></td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+          {% if not targets %}
+          <tr>
+            <td colspan="7" class="muted">No deployments yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const providerModels = {{ provider_models_json | safe }};
+    const providerParams = {{ provider_params_json | safe }};
+    const providerEquivalents = {{ provider_equivalents_json | safe }};
+
+    const providerSelect = document.getElementById("provider-select");
+    const connectionSelect = document.getElementById("connection-select");
+    const modelSelect = document.getElementById("model-select");
+    const modelCustomToggle = document.getElementById("model-custom-toggle");
+    const modelCustomInput = document.getElementById("model-custom-input");
+    const modelMeta = document.getElementById("model-meta");
+    const paramsControls = document.getElementById("model-params-controls");
+    const paramsJsonInput = document.getElementById("params-json-input");
+    const form = document.getElementById("deployment-form");
+
+    const initialModel = {{ (selected.model_identifier if selected else "gpt-5-nano") | tojson }};
+    const selectedParams = {{ (selected.params_json if selected else {}) | tojson }};
+    let activeParamSpecs = [];
+
+    function sanitizeId(key) {
+      return String(key || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function selectedConnectionProvider() {
+      if (!connectionSelect) return "";
+      const option = connectionSelect.options[connectionSelect.selectedIndex];
+      if (!option) return "";
+      return option.getAttribute("data-provider") || "";
+    }
+
+    function selectedModel() {
+      if (!modelSelect) return "";
+      if (modelSelect.value === "__custom__") {
+        return (modelCustomInput.value || "").trim();
+      }
+      return modelSelect.value;
+    }
+
+    function syncCustomMode() {
+      const customMode = modelSelect && modelSelect.value === "__custom__";
+      if (modelCustomToggle) {
+        modelCustomToggle.checked = customMode;
+      }
+      if (modelCustomInput) {
+        modelCustomInput.style.display = customMode ? "block" : "none";
+        modelCustomInput.required = customMode;
+      }
+    }
+
+    function refreshProviderMirror() {
+      const provider = selectedConnectionProvider();
+      if (!providerSelect) return;
+      providerSelect.value = provider;
+    }
+
+    function initialParamValue(spec) {
+      if (spec.key === "reasoning_effort") {
+        const reasoning = selectedParams.reasoning;
+        if (reasoning && typeof reasoning === "object" && typeof reasoning.effort === "string") {
+          return reasoning.effort;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(selectedParams, spec.key)) {
+        return selectedParams[spec.key];
+      }
+      if (spec.default !== null && spec.default !== undefined) {
+        return spec.default;
+      }
+      if (spec.type === "boolean") {
+        return false;
+      }
+      if (spec.type === "enum" && Array.isArray(spec.values) && spec.values.length > 0) {
+        return spec.values[0];
+      }
+      return "";
+    }
+
+    function renderModelParams() {
+      const provider = selectedConnectionProvider();
+      const model = selectedModel();
+      const allParams = (providerParams[provider] || {})[model] || [];
+      activeParamSpecs = allParams.filter((item) => item.supported);
+
+      if (activeParamSpecs.length === 0) {
+        paramsControls.innerHTML = '<p class="small muted">No configurable parameters declared for this model.</p>';
+        return;
+      }
+
+      const html = activeParamSpecs.map((spec) => {
+        const inputId = `param-input-${sanitizeId(spec.key)}`;
+        const value = initialParamValue(spec);
+        const rangeText = (spec.min !== null && spec.max !== null) ? `Range: ${spec.min} to ${spec.max}.` : "";
+        const description = spec.description || "";
+
+        if (spec.type === "enum") {
+          const options = (spec.values || []).map((item) => `<option value="${item}" ${String(item) === String(value) ? "selected" : ""}>${item}</option>`).join("");
+          return `
+            <label class="label">${spec.key}</label>
+            <select id="${inputId}" data-param-key="${spec.key}" data-param-type="enum">${options}</select>
+            <p class="small muted">${description} ${rangeText}</p>
+          `;
+        }
+
+        if (spec.type === "integer" || spec.type === "number") {
+          const step = spec.type === "integer" ? "1" : "0.01";
+          const minAttr = spec.min !== null ? `min="${spec.min}"` : "";
+          const maxAttr = spec.max !== null ? `max="${spec.max}"` : "";
+          return `
+            <label class="label">${spec.key}</label>
+            <input id="${inputId}" type="number" step="${step}" ${minAttr} ${maxAttr} value="${value}" data-param-key="${spec.key}" data-param-type="${spec.type}" required />
+            <p class="small muted">${description} ${rangeText}</p>
+          `;
+        }
+
+        if (spec.type === "boolean") {
+          const checked = value ? "checked" : "";
+          return `
+            <label class="check"><input id="${inputId}" type="checkbox" ${checked} data-param-key="${spec.key}" data-param-type="boolean" /> ${spec.key}</label>
+            <p class="small muted">${description}</p>
+          `;
+        }
+
+        return `
+          <label class="label">${spec.key}</label>
+          <input id="${inputId}" type="text" value="${value}" data-param-key="${spec.key}" data-param-type="string" />
+          <p class="small muted">${description}</p>
+        `;
+      }).join("");
+
+      paramsControls.innerHTML = html;
+    }
+
+    function refreshModelOptions() {
+      const provider = selectedConnectionProvider();
+      const models = providerModels[provider] || [];
+      const desired = selectedModel() || initialModel;
+
+      while (modelSelect.firstChild) modelSelect.removeChild(modelSelect.firstChild);
+      models.forEach((model) => {
+        const option = document.createElement("option");
+        option.value = model;
+        option.textContent = model;
+        if (model === desired) {
+          option.selected = true;
+        }
+        modelSelect.appendChild(option);
+      });
+
+      const customOption = document.createElement("option");
+      customOption.value = "__custom__";
+      customOption.textContent = "Custom model/deployment...";
+      modelSelect.appendChild(customOption);
+
+      if (desired && !models.includes(desired)) {
+        modelSelect.value = "__custom__";
+        modelCustomInput.value = desired;
+      } else if (!modelSelect.value && models.length > 0) {
+        modelSelect.value = models[0];
+      } else if (!modelSelect.value) {
+        modelSelect.value = "__custom__";
+      }
+
+      syncCustomMode();
+      refreshModelMeta();
+      renderModelParams();
+    }
+
+    function refreshModelMeta() {
+      const provider = selectedConnectionProvider();
+      const model = selectedModel();
+      if (!provider || !model) {
+        modelMeta.textContent = "Choose a provider connection to load model options and capability notes.";
+        return;
+      }
+      const equivalents = (providerEquivalents[provider] || {})[model] || [];
+      const eqText = equivalents.length > 0
+        ? `Equivalent switches: ${equivalents.map((item) => `${item.provider}/${item.model}`).join(", ")}`
+        : "No mapped equivalent models.";
+      modelMeta.textContent = eqText;
+    }
+
+    function collectParams() {
+      const output = {};
+      const knownKeys = new Set(activeParamSpecs.map((spec) => spec.key));
+      knownKeys.add("reasoning");
+
+      for (const [key, value] of Object.entries(selectedParams || {})) {
+        if (!knownKeys.has(key)) {
+          output[key] = value;
+        }
+      }
+
+      for (const spec of activeParamSpecs) {
+        const inputId = `param-input-${sanitizeId(spec.key)}`;
+        const element = document.getElementById(inputId);
+        if (!element) continue;
+
+        let parsedValue = null;
+        if (spec.type === "boolean") {
+          parsedValue = element.checked;
+        } else if (spec.type === "integer") {
+          parsedValue = parseInt(element.value, 10);
+          if (!Number.isFinite(parsedValue)) throw new Error(`${spec.key} must be an integer.`);
+        } else if (spec.type === "number") {
+          parsedValue = parseFloat(element.value);
+          if (!Number.isFinite(parsedValue)) throw new Error(`${spec.key} must be a number.`);
+        } else {
+          parsedValue = String(element.value || "").trim();
+          if (!parsedValue) throw new Error(`${spec.key} is required.`);
+        }
+
+        if ((spec.type === "integer" || spec.type === "number") && spec.min !== null && parsedValue < spec.min) {
+          throw new Error(`${spec.key} must be >= ${spec.min}.`);
+        }
+        if ((spec.type === "integer" || spec.type === "number") && spec.max !== null && parsedValue > spec.max) {
+          throw new Error(`${spec.key} must be <= ${spec.max}.`);
+        }
+        if (spec.type === "enum" && Array.isArray(spec.values) && spec.values.length > 0 && !spec.values.includes(parsedValue)) {
+          throw new Error(`${spec.key} must be one of: ${spec.values.join(", ")}.`);
+        }
+
+        if (spec.key === "reasoning_effort") {
+          output.reasoning = { effort: String(parsedValue) };
+        } else {
+          output[spec.key] = parsedValue;
+        }
+      }
+
+      return output;
+    }
+
+    if (connectionSelect) {
+      connectionSelect.addEventListener("change", () => {
+        refreshProviderMirror();
+        refreshModelOptions();
+      });
+    }
+
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        syncCustomMode();
+        refreshModelMeta();
+        renderModelParams();
+      });
+    }
+
+    if (modelCustomToggle) {
+      modelCustomToggle.addEventListener("change", () => {
+        if (modelCustomToggle.checked) {
+          modelSelect.value = "__custom__";
+        } else {
+          const provider = selectedConnectionProvider();
+          const models = providerModels[provider] || [];
+          if (models.length > 0) {
+            modelSelect.value = models[0];
+          }
+        }
+        syncCustomMode();
+        refreshModelMeta();
+        renderModelParams();
+      });
+    }
+
+    if (modelCustomInput) {
+      modelCustomInput.addEventListener("input", () => {
+        refreshModelMeta();
+        renderModelParams();
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", (event) => {
+        try {
+          paramsJsonInput.value = JSON.stringify(collectParams());
+        } catch (error) {
+          event.preventDefault();
+          alert(error.message || "Invalid parameter value.");
+        }
+      });
+    }
+
+    refreshProviderMirror();
+    refreshModelOptions();
+  })();
+</script>
+{% endblock %}

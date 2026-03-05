@@ -1,0 +1,32 @@
+model: gpt-5.2-pro
+display_name: GPT-5.2 Pro
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Highest-quality GPT-5.2 tier for advanced reasoning and coding.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 4096
+    description: Upper bound on generated tokens.
+    increase_effect: Enables long-form outputs and multi-phase plans.
+    decrease_effect: Keeps responses compact.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [low, medium, high]
+    default: high
+    description: Controls reasoning depth for difficult tasks.
+    increase_effect: Improves robustness for difficult tasks.
+    decrease_effect: Reduces latency and cost.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Unsupported for this model profile.

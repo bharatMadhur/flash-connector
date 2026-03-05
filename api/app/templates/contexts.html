@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <h2>Context Block Library</h2>
+  <p class="muted small">Attach reusable policy, product, or domain context to endpoint versions.</p>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h2>Context Blocks</h2>
+      <span class="badge info">{{ contexts|length }}</span>
+    </div>
+    <p class="muted small">Reusable policies, product docs, or snippets that can be attached to endpoint versions.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Tags</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for block in contexts %}
+          <tr>
+            <td>{{ block.name }}</td>
+            <td>{{ (block.tags or []) | join(', ') }}</td>
+            <td><a href="/contexts?context_id={{ block.id }}">Edit</a></td>
+          </tr>
+          {% endfor %}
+          {% if not contexts %}
+          <tr>
+            <td colspan="3" class="muted">No context blocks yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Create Context Block</h2>
+    <form method="post" action="/contexts/create" class="stack">
+      <label class="label">Name</label>
+      <input type="text" name="name" placeholder="Refund Policy v3" required />
+      <label class="label">Content</label>
+      <textarea name="content" placeholder="Rules and policy text" required></textarea>
+      <label class="label">Tags (comma-separated)</label>
+      <input type="text" name="tags" placeholder="policy,refunds" />
+      <button type="submit" class="btn">Create block</button>
+    </form>
+  </section>
+</div>
+
+{% if selected %}
+<section class="card">
+  <h3>Edit Context Block: {{ selected.name }}</h3>
+  <form method="post" action="/contexts/{{ selected.id }}/update" class="stack">
+    <label class="label">Name</label>
+    <input type="text" name="name" value="{{ selected.name }}" required />
+    <label class="label">Content</label>
+    <textarea name="content" required>{{ selected.content }}</textarea>
+    <label class="label">Tags (comma-separated)</label>
+    <input type="text" name="tags" value="{{ (selected.tags or []) | join(', ') }}" />
+    <button type="submit" class="btn">Save block</button>
+  </form>
+  <form method="post" action="/contexts/{{ selected.id }}/delete" class="inline-form">
+    <button type="submit" class="btn btn-danger">Delete block</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

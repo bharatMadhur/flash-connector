@@ -1,0 +1,22 @@
+model: text-embedding-3-large
+display_name: text-embedding-3-large
+family: text-embedding-3
+category: embeddings
+supports_realtime: false
+supports_vision: false
+supports_tools: false
+notes: Highest-quality embedding model.
+parameters:
+  dimensions:
+    supported: true
+    type: integer
+    min: 256
+    max: 3072
+    default: 3072
+    description: Optional output vector dimensionality.
+  encoding_format:
+    supported: true
+    type: enum
+    values: [float, base64]
+    default: float
+    description: Output encoding format.

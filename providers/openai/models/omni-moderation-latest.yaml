@@ -1,0 +1,15 @@
+model: omni-moderation-latest
+display_name: omni-moderation-latest
+family: moderation
+category: moderation
+supports_realtime: false
+supports_vision: true
+supports_tools: false
+notes: Unified moderation model for text and image safety classification.
+parameters:
+  input_type:
+    supported: true
+    type: enum
+    values: [text, image, mixed]
+    default: mixed
+    description: Input modality used for moderation.

@@ -1,0 +1,28 @@
+model: o3-mini
+display_name: o3-mini
+family: o-series
+category: reasoning
+supports_realtime: false
+supports_vision: false
+supports_tools: true
+notes: Lighter o-series reasoning model.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 200000
+    default: 768
+    description: Maximum output length.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [minimal, low, medium]
+    default: medium
+    description: Reasoning depth control.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Unsupported for this model family.

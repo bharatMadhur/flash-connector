@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero playground-hero">
+  <div class="page-hero-grid">
+    <div class="hero-intro">
+      <p class="kicker">Developer Playground</p>
+      <h2>Run, Inspect, and Generate Production Snippets</h2>
+      <p class="muted small">This workspace mirrors real client behavior: dry-run token advisor, public API submit/poll, and SDK/curl generation.</p>
+      <div class="hero-actions">
+        <a class="btn btn-secondary" href="/developers">Developer Docs</a>
+        <a class="btn btn-secondary" href="/apis">Manage APIs</a>
+        <a class="btn btn-secondary" href="/api-keys">Manage API Keys</a>
+      </div>
+    </div>
+    <div class="hero-kpi-grid">
+      <article class="hero-kpi">
+        <p class="kicker">APIs</p>
+        <strong>{{ endpoint_rows|length }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Active Keys</p>
+        <strong>{{ key_rows | selectattr("is_active") | list | length }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Mode</p>
+        <strong>Async</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Path</p>
+        <strong>/v1</strong>
+      </article>
+    </div>
+  </div>
+  <div class="workflow-strip">
+    <span class="workflow-chip">1. Select API</span>
+    <span class="workflow-chip">2. Dry-run advisor</span>
+    <span class="workflow-chip">3. Submit live job</span>
+    <span class="workflow-chip">4. Poll + inspect usage</span>
+    <span class="workflow-chip">5. Save training</span>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+{% if not endpoint_rows %}
+<section class="card">
+  <div class="flash warn">
+    No APIs found for this tenant.
+    <a href="/apis">Create an API</a> and activate a version first.
+  </div>
+</section>
+{% else %}
+
+<section class="card">
+  <div class="card-head">
+    <h3>Python Test Lab Presets</h3>
+    <span class="badge info">Load one-click scenarios</span>
+  </div>
+  <p class="muted small">Choose a scenario, inject it into forms, then run immediately. Snippet updates with your selected API and key.</p>
+  <div class="playground-lab-toolbar">
+    <div>
+      <label class="label" for="playground-lab-select">Scenario</label>
+      <select id="playground-lab-select">
+        <option value="async-baseline">Async baseline</option>
+        <option value="idempotent-retry">Idempotent retry-safe run</option>
+        <option value="subtenant-attribution">Sub-tenant attribution</option>
+        <option value="training-candidate">Training candidate capture</option>
+        <option value="batch-flex">Batch flex processing</option>
+      </select>
+    </div>
+    <div class="playground-lab-actions">
+      <button type="button" class="btn" id="playground-lab-load">Load into forms</button>
+      <button type="button" class="btn btn-secondary snippet-copy" data-target="playground-lab-snippet">Copy Python lab</button>
+    </div>
+  </div>
+  <p class="muted small" id="playground-lab-description"></p>
+  <pre id="playground-lab-snippet">Select a scenario to generate a snippet.</pre>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h3>1) Dry Run Advisor</h3>
+      <span class="badge info">No provider call</span>
+    </div>
+    <p class="muted small">Estimates token volume, cacheability, and cost posture using the API's live prompt and active model settings.</p>
+
+    <form id="dry-run-form" class="stack">
+      <label class="label">API</label>
+      <select id="dry-endpoint-id">
+        {% for endpoint in endpoint_rows %}
+        <option value="{{ endpoint.id }}" {% if selected_endpoint_id == endpoint.id %}selected{% endif %}>
+          {{ endpoint.name }} ({{ endpoint.id }}){% if not endpoint.has_active_version %} · no live version{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Input</label>
+      <textarea id="dry-input" placeholder="Summarize this support issue in 3 bullets.">Summarize this support issue in 3 bullets.</textarea>
+
+      <label class="label">Metadata JSON</label>
+      <textarea id="dry-metadata-json">{"source":"playground","priority":"high"}</textarea>
+
+      <button type="submit" class="btn">Estimate tokens + cost</button>
+    </form>
+
+    <h4>Dry Run Output</h4>
+    <pre id="dry-run-output">No estimate yet.</pre>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h3>2) Public API Live Runner</h3>
+      <span class="badge">Uses real <code>x-api-key</code></span>
+    </div>
+    <p class="muted small">This calls the exact public routes used by production clients.</p>
+
+    <form id="public-run-form" class="stack">
+      <label class="label">API key</label>
+      <input type="password" id="public-api-key" placeholder="fc_xxx" />
+
+      <label class="label">API</label>
+      <select id="public-endpoint-id">
+        {% for endpoint in endpoint_rows %}
+        <option value="{{ endpoint.id }}" {% if selected_endpoint_id == endpoint.id %}selected{% endif %}>
+          {{ endpoint.name }} ({{ endpoint.id }}){% if not endpoint.has_active_version %} · no live version{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Input</label>
+      <textarea id="public-input" placeholder="Say hello in one line">Say hello in one line</textarea>
+
+      <label class="label">Metadata JSON</label>
+      <textarea id="public-metadata-json">{"source":"playground","channel":"web"}</textarea>
+
+      <div class="grid-2">
+        <div>
+          <label class="label">Sub-tenant code (optional)</label>
+          <input type="text" id="public-subtenant-code" placeholder="ACME-TEAM-A" />
+        </div>
+        <div>
+          <label class="label">Idempotency key (optional)</label>
+          <input type="text" id="public-idempotency-key" placeholder="req-20260227-001" />
+        </div>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="public-save-default" /> Save to training by default
+      </label>
+
+      <div class="stack-inline">
+        <button type="submit" class="btn">Submit job</button>
+        <button type="button" class="btn btn-secondary" id="public-poll-btn">Poll latest job</button>
+        <a class="btn btn-secondary" href="#" id="open-job-link">Open Run</a>
+      </div>
+    </form>
+
+    <h4>Live API Output</h4>
+    <pre id="public-run-output">No live run yet.</pre>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h3>3) Console Run (Session Auth)</h3>
+    <span class="badge info">No API key needed</span>
+  </div>
+  <p class="muted small">Queues a run directly from console session and opens full run timeline page.</p>
+  <form method="post" action="/playground/submit" class="stack">
+    <label class="label">API</label>
+    <select name="endpoint_id" id="console-endpoint-id">
+      {% for endpoint in endpoint_rows %}
+      <option value="{{ endpoint.id }}" {% if selected_endpoint_id == endpoint.id %}selected{% endif %}>
+        {{ endpoint.name }} ({{ endpoint.id }}){% if not endpoint.has_active_version %} · no live version{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+
+    <label class="label">Input</label>
+    <textarea name="input_text" id="console-input" placeholder="Draft a friendly status update for shipment delay">Draft a friendly status update for shipment delay</textarea>
+
+    <label class="label">Metadata JSON</label>
+    <textarea name="metadata_json" id="console-metadata-json">{"source":"console-playground","locale":"en-US"}</textarea>
+
+    <label class="label">Sub-tenant code (optional)</label>
+    <input type="text" name="subtenant_code" placeholder="ACME-TEAM-A" />
+
+    <label class="check">
+      <input type="checkbox" name="save_default" /> Save to training by default
+    </label>
+
+    <button type="submit" class="btn">Queue console run</button>
+  </form>
+</section>
+
+<section class="card subtle-card">
+  <div class="card-head">
+    <h3>Generated Snippets</h3>
+    <div class="stack-inline">
+      <button type="button" class="btn btn-secondary snippet-copy" data-target="curl-snippet">Copy curl</button>
+      <button type="button" class="btn btn-secondary snippet-copy" data-target="sdk-snippet">Copy SDK</button>
+      <button type="button" class="btn btn-secondary snippet-copy" data-target="poll-snippet">Copy poll</button>
+    </div>
+  </div>
+  <p class="muted small">Snippets stay in sync with your Public API form values.</p>
+  <div class="snippet-grid">
+    <div>
+      <h4>curl submit</h4>
+      <pre id="curl-snippet"></pre>
+    </div>
+    <div>
+      <h4>Python SDK submit + wait</h4>
+      <pre id="sdk-snippet"></pre>
+    </div>
+    <div>
+      <h4>curl poll</h4>
+      <pre id="poll-snippet"></pre>
+    </div>
+  </div>
+  <div class="chip-row">
+    {% for key in key_rows if key.is_active %}
+    <span class="chip">{{ key.name }} · <code>{{ key.key_prefix }}</code></span>
+    {% endfor %}
+    {% if not key_rows %}
+    <span class="chip">No keys yet</span>
+    {% endif %}
+  </div>
+</section>
+
+<script>
+  (() => {
+    const dryRunForm = document.getElementById("dry-run-form");
+    const dryEndpointId = document.getElementById("dry-endpoint-id");
+    const dryInput = document.getElementById("dry-input");
+    const dryMetadata = document.getElementById("dry-metadata-json");
+    const dryRunOutput = document.getElementById("dry-run-output");
+
+    const publicRunForm = document.getElementById("public-run-form");
+    const publicApiKey = document.getElementById("public-api-key");
+    const publicEndpointId = document.getElementById("public-endpoint-id");
+    const publicInput = document.getElementById("public-input");
+    const publicMetadata = document.getElementById("public-metadata-json");
+    const publicSubtenantCode = document.getElementById("public-subtenant-code");
+    const publicIdempotencyKey = document.getElementById("public-idempotency-key");
+    const publicSaveDefault = document.getElementById("public-save-default");
+    const publicRunOutput = document.getElementById("public-run-output");
+    const publicPollBtn = document.getElementById("public-poll-btn");
+    const openJobLink = document.getElementById("open-job-link");
+
+    const consoleEndpointId = document.getElementById("console-endpoint-id");
+    const consoleInput = document.getElementById("console-input");
+    const consoleMetadata = document.getElementById("console-metadata-json");
+
+    const curlSnippet = document.getElementById("curl-snippet");
+    const sdkSnippet = document.getElementById("sdk-snippet");
+    const pollSnippet = document.getElementById("poll-snippet");
+
+    const labSelect = document.getElementById("playground-lab-select");
+    const labLoadButton = document.getElementById("playground-lab-load");
+    const labDescription = document.getElementById("playground-lab-description");
+    const labSnippet = document.getElementById("playground-lab-snippet");
+
+    let latestJobId = "";
+
+    const labScenarios = {
+      "async-baseline": {
+        description: "Standard submit + poll flow for one request.",
+        input: "Give me a one-line executive summary of this status update.",
+        metadata: { source: "playground-lab", profile: "async-baseline" },
+        subtenant_code: "",
+        idempotency_key: "",
+        save_default: false,
+        mode: "job",
+      },
+      "idempotent-retry": {
+        description: "Safe for client retries; duplicate submit returns same job_id.",
+        input: "Summarize this incident in one line for leadership.",
+        metadata: { source: "playground-lab", profile: "idempotent-retry" },
+        subtenant_code: "",
+        idempotency_key: "docs-retry-001",
+        save_default: false,
+        mode: "job",
+      },
+      "subtenant-attribution": {
+        description: "Tracks usage by subtenant_code for billing and analytics.",
+        input: "Draft onboarding message for partner workspace.",
+        metadata: { source: "playground-lab", profile: "subtenant-attribution" },
+        subtenant_code: "ACME-TEAM-A",
+        idempotency_key: "",
+        save_default: false,
+        mode: "job",
+      },
+      "training-candidate": {
+        description: "Sends runs with save_default=true to speed up dataset curation.",
+        input: "Generate a polite refund response for delayed shipment.",
+        metadata: { source: "playground-lab", profile: "training-candidate" },
+        subtenant_code: "",
+        idempotency_key: "",
+        save_default: true,
+        mode: "job",
+      },
+      "batch-flex": {
+        description: "Uses provider-native batch in flex tier for low-cost async bulk jobs.",
+        input: "Classify support ticket sentiment.",
+        metadata: { source: "playground-lab", profile: "batch-flex" },
+        subtenant_code: "",
+        idempotency_key: "",
+        save_default: false,
+        mode: "batch",
+      },
+    };
+
+    function parseJsonInput(raw, fallback = {}) {
+      const text = String(raw || "").trim();
+      if (!text) return fallback;
+      return JSON.parse(text);
+    }
+
+    function syncEndpointSelections(sourceValue) {
+      [dryEndpointId, publicEndpointId, consoleEndpointId].forEach((select) => {
+        if (!select) return;
+        if (Array.from(select.options).some((option) => option.value === sourceValue)) {
+          select.value = sourceValue;
+        }
+      });
+    }
+
+    function renderSnippets() {
+      const endpointId = publicEndpointId.value || "YOUR_ENDPOINT_ID";
+      const apiKeyValue = publicApiKey.value.trim() || "fc_xxx";
+      const inputValue = publicInput.value.trim() || "Say hello in one line";
+      let metadataValue = {};
+      try {
+        metadataValue = parseJsonInput(publicMetadata.value, {});
+      } catch (_err) {
+        metadataValue = {};
+      }
+
+      const payload = {
+        input: inputValue,
+        metadata: metadataValue,
+      };
+      if (publicSaveDefault.checked) {
+        payload.save_default = true;
+      }
+      const subtenantCode = publicSubtenantCode.value.trim();
+      if (subtenantCode) {
+        payload.subtenant_code = subtenantCode;
+      }
+
+      const idempotencyKey = publicIdempotencyKey.value.trim();
+      const curlLines = [
+        `curl -s -X POST http://localhost:8000/v1/endpoints/${endpointId}/jobs \\`,
+        `  -H "x-api-key: ${apiKeyValue}" \\`,
+        `  -H "Content-Type: application/json" \\`,
+      ];
+      if (idempotencyKey) {
+        curlLines.push(`  -H "Idempotency-Key: ${idempotencyKey}" \\`);
+      }
+      curlLines.push(`  -d '${JSON.stringify(payload)}'`);
+      curlSnippet.textContent = curlLines.join("\n");
+
+      const sdkArgs = [
+        `"${endpointId}"`,
+        `input_text=${JSON.stringify(inputValue)}`,
+        `metadata=${JSON.stringify(metadataValue)}`,
+      ];
+      if (subtenantCode) {
+        sdkArgs.push(`subtenant_code=${JSON.stringify(subtenantCode)}`);
+      }
+      if (idempotencyKey) {
+        sdkArgs.push(`idempotency_key=${JSON.stringify(idempotencyKey)}`);
+      }
+      if (publicSaveDefault.checked) {
+        sdkArgs.push("save_default=True");
+      }
+
+      sdkSnippet.textContent = [
+        "from sdk import FlashConnectorClient",
+        "",
+        `with FlashConnectorClient(base_url="http://localhost:8000", api_key="${apiKeyValue}") as client:`,
+        `    submission = client.submit_job(${sdkArgs.join(", ")})`,
+        "    job = client.wait_for_job(submission.job_id)",
+        "    print(job.status, job.result_text)",
+      ].join("\n");
+
+      const pollJobId = latestJobId || "JOB_ID";
+      pollSnippet.textContent = [
+        `curl -s http://localhost:8000/v1/jobs/${pollJobId} \\`,
+        `  -H "x-api-key: ${apiKeyValue}"`,
+      ].join("\n");
+
+      renderLabSnippet();
+    }
+
+    function setPublicOutput(payload) {
+      publicRunOutput.textContent = JSON.stringify(payload, null, 2);
+    }
+
+    async function runDryEstimate(event) {
+      event.preventDefault();
+      let metadata = {};
+      try {
+        metadata = parseJsonInput(dryMetadata.value, {});
+      } catch (err) {
+        dryRunOutput.textContent = JSON.stringify({ ok: false, error: `Invalid metadata JSON: ${err.message}` }, null, 2);
+        return;
+      }
+
+      dryRunOutput.textContent = "Estimating...";
+      const response = await fetch("/playground/dry-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint_id: dryEndpointId.value,
+          input: dryInput.value,
+          metadata: metadata,
+        }),
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "Unable to parse response" }));
+      dryRunOutput.textContent = JSON.stringify(payload, null, 2);
+      if (payload.ok) {
+        syncEndpointSelections(String(payload.endpoint_id || ""));
+      }
+    }
+
+    async function submitPublicRun(event) {
+      event.preventDefault();
+      const apiKey = publicApiKey.value.trim();
+      if (!apiKey) {
+        setPublicOutput({ ok: false, error: "API key is required." });
+        return;
+      }
+
+      let metadata = {};
+      try {
+        metadata = parseJsonInput(publicMetadata.value, {});
+      } catch (err) {
+        setPublicOutput({ ok: false, error: `Invalid metadata JSON: ${err.message}` });
+        return;
+      }
+
+      const endpointId = publicEndpointId.value;
+      const payload = {
+        input: publicInput.value || "Say hello in one line",
+        metadata: metadata,
+        save_default: publicSaveDefault.checked,
+      };
+      const subtenantCode = publicSubtenantCode.value.trim();
+      if (subtenantCode) {
+        payload.subtenant_code = subtenantCode;
+      }
+
+      const headers = {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+      };
+      const idemKey = publicIdempotencyKey.value.trim();
+      if (idemKey) {
+        headers["Idempotency-Key"] = idemKey;
+      }
+
+      setPublicOutput({ ok: true, status: "submitting" });
+      const response = await fetch(`/v1/endpoints/${endpointId}/jobs`, {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setPublicOutput({ ok: false, status_code: response.status, error: data.detail || data.error || "Request failed" });
+        return;
+      }
+
+      latestJobId = data.job_id || "";
+      if (latestJobId) {
+        openJobLink.href = `/runs/${latestJobId}`;
+        openJobLink.textContent = `Open ${latestJobId}`;
+      }
+      setPublicOutput({ ok: true, submit: data, poll_hint: "Click 'Poll latest job' to get completion result." });
+      renderSnippets();
+    }
+
+    async function pollPublicJob() {
+      const apiKey = publicApiKey.value.trim();
+      if (!apiKey) {
+        setPublicOutput({ ok: false, error: "API key is required for polling." });
+        return;
+      }
+      if (!latestJobId) {
+        setPublicOutput({ ok: false, error: "No job_id available. Submit a job first." });
+        return;
+      }
+
+      const response = await fetch(`/v1/jobs/${latestJobId}`, {
+        method: "GET",
+        headers: { "x-api-key": apiKey },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setPublicOutput({ ok: false, status_code: response.status, error: data.detail || data.error || "Poll failed" });
+        return;
+      }
+      setPublicOutput({ ok: true, job: data });
+      renderSnippets();
+    }
+
+    function renderLabSnippet() {
+      const selected = labScenarios[labSelect.value] || labScenarios["async-baseline"];
+      const endpointId = publicEndpointId.value || "YOUR_ENDPOINT_ID";
+      const apiKey = publicApiKey.value.trim() || "fc_xxx";
+      if (labDescription) {
+        labDescription.textContent = selected.description;
+      }
+
+      if (selected.mode === "batch") {
+        labSnippet.textContent = [
+          "from sdk import FlashConnectorClient",
+          "",
+          `with FlashConnectorClient(base_url="http://localhost:8000", api_key="${apiKey}") as client:`,
+          `    batch = client.submit_batch("${endpointId}",`,
+          "        inputs=[",
+          "            \"Classify ticket: billing issue\",",
+          "            \"Classify ticket: login failure\",",
+          "            \"Classify ticket: account upgrade\",",
+          "        ],",
+          "        batch_name=\"playground-flex-batch\",",
+          "        service_tier=\"flex\",",
+          `        metadata=${JSON.stringify(selected.metadata)},`,
+          "    )",
+          "    detail = client.wait_for_batch(batch.batch_id, timeout_seconds=7200)",
+          "    print(detail.status, detail.completed_jobs, detail.failed_jobs)",
+        ].join("\n");
+        return;
+      }
+
+      const callArgs = [
+        `"${endpointId}"`,
+        `input_text=${JSON.stringify(selected.input)}`,
+        `metadata=${JSON.stringify(selected.metadata)}`,
+      ];
+      if (selected.subtenant_code) {
+        callArgs.push(`subtenant_code=${JSON.stringify(selected.subtenant_code)}`);
+      }
+      if (selected.idempotency_key) {
+        callArgs.push(`idempotency_key=${JSON.stringify(selected.idempotency_key)}`);
+      }
+      if (selected.save_default) {
+        callArgs.push("save_default=True");
+      }
+
+      labSnippet.textContent = [
+        "from sdk import FlashConnectorClient",
+        "",
+        `with FlashConnectorClient(base_url="http://localhost:8000", api_key="${apiKey}") as client:`,
+        `    submission = client.submit_job(${callArgs.join(", ")})`,
+        "    job = client.wait_for_job(submission.job_id, timeout_seconds=180)",
+        "    print(job.status, job.result_text)",
+      ].join("\n");
+    }
+
+    function applyLabScenario() {
+      const selected = labScenarios[labSelect.value] || labScenarios["async-baseline"];
+      publicInput.value = selected.input;
+      dryInput.value = selected.input;
+      consoleInput.value = selected.input;
+
+      publicMetadata.value = JSON.stringify(selected.metadata);
+      dryMetadata.value = JSON.stringify(selected.metadata);
+      consoleMetadata.value = JSON.stringify(selected.metadata);
+
+      publicSubtenantCode.value = selected.subtenant_code || "";
+      publicIdempotencyKey.value = selected.idempotency_key || "";
+      publicSaveDefault.checked = !!selected.save_default;
+
+      renderSnippets();
+      renderLabSnippet();
+    }
+
+    dryRunForm.addEventListener("submit", runDryEstimate);
+    publicRunForm.addEventListener("submit", submitPublicRun);
+    publicPollBtn.addEventListener("click", pollPublicJob);
+
+    [dryEndpointId, publicEndpointId, consoleEndpointId].forEach((select) => {
+      select.addEventListener("change", () => {
+        syncEndpointSelections(select.value);
+        renderSnippets();
+      });
+    });
+
+    [publicApiKey, publicInput, publicMetadata, publicSubtenantCode, publicIdempotencyKey, publicSaveDefault].forEach((element) => {
+      element.addEventListener("input", renderSnippets);
+      element.addEventListener("change", renderSnippets);
+    });
+
+    document.querySelectorAll(".snippet-copy").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const targetId = button.getAttribute("data-target");
+        const target = document.getElementById(targetId);
+        if (!target) return;
+        const previous = button.textContent;
+        try {
+          await navigator.clipboard.writeText(target.textContent || "");
+          button.textContent = "Copied";
+        } catch (_err) {
+          button.textContent = "Copy failed";
+        }
+        setTimeout(() => {
+          button.textContent = previous;
+        }, 1200);
+      });
+    });
+
+    labLoadButton.addEventListener("click", applyLabScenario);
+    labSelect.addEventListener("change", renderLabSnippet);
+
+    openJobLink.href = "#";
+    openJobLink.textContent = "Open Run";
+    renderSnippets();
+    renderLabSnippet();
+  })();
+</script>
+
+{% endif %}
+{% endblock %}

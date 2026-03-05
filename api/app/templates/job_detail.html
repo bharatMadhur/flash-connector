@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="card-head">
+    <h2>Run <code>{{ job.id }}</code></h2>
+    <span class="badge {% if job.status.value in ['failed', 'canceled'] %}warn{% endif %}">{{ job.status.value }}</span>
+  </div>
+
+  <div class="chip-row">
+    <span class="chip">API: {{ endpoint.name if endpoint else job.endpoint_id }}</span>
+    <span class="chip">Version ID: {{ job.endpoint_version_id }}</span>
+    <span class="chip">Provider: {{ job.provider_used or "-" }}</span>
+    <span class="chip">Model: {{ job.model_used or "-" }}</span>
+    <span class="chip">Sub-tenant: {{ job.subtenant_code or "-" }}</span>
+    <span class="chip">Queue wait: {% if queue_wait_ms is not none %}{{ '%.0f'|format(queue_wait_ms) }} ms{% else %}-{% endif %}</span>
+    <span class="chip">Runtime: {% if runtime_ms is not none %}{{ '%.0f'|format(runtime_ms) }} ms{% else %}-{% endif %}</span>
+    <span class="chip">Estimated cost: {% if job.estimated_cost_usd is not none %}${{ '%.8f'|format(job.estimated_cost_usd) }}{% else %}-{% endif %}</span>
+    <span class="chip">Cache: {{ "hit" if job.cache_hit else "miss" }}</span>
+  </div>
+
+  <p class="small muted">Provider response id: <code>{{ job.provider_response_id or "-" }}</code></p>
+  {% if job.cached_from_job_id %}
+  <p class="small muted">Cache source run: <code>{{ job.cached_from_job_id }}</code></p>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h3>Run Timeline</h3>
+      <span class="badge info">{{ timeline_events|length }} events</span>
+    </div>
+    <div class="list-pane">
+      {% for item in timeline_events %}
+      <article class="version-card">
+        <strong>{{ item.title }}</strong>
+        <p class="small muted">{{ item.at }}</p>
+        <p class="small">{{ item.detail }}</p>
+      </article>
+      {% endfor %}
+      {% if not timeline_events %}
+      <p class="muted small">No timeline events captured.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h3>Token & Cost Advisor</h3>
+      {% if advisor %}
+      <span class="badge">{{ advisor.cacheability_band }}</span>
+      {% else %}
+      <span class="badge warn">unavailable</span>
+      {% endif %}
+    </div>
+    {% if advisor %}
+    <div class="chip-row">
+      <span class="chip">Input estimate: {{ advisor.input_tokens_estimate }}</span>
+      <span class="chip">Output target: {{ advisor.output_tokens_target }}</span>
+      <span class="chip">Expected cost: {% if advisor.expected_cost_usd is not none %}${{ '%.8f'|format(advisor.expected_cost_usd) }}{% else %}-{% endif %}</span>
+      <span class="chip">Cacheability score: {{ advisor.cacheability_score }}</span>
+      <span class="chip">Estimator: {{ advisor.estimate_source }}</span>
+    </div>
+    {% if advisor.tips %}
+    <ul class="list-tight muted small">
+      {% for tip in advisor.tips %}
+      <li>{{ tip }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% else %}
+    <p class="muted small">Advisor metadata is not available for this run.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h3>Result</h3>
+  <pre>{{ job.result_text or "-" }}</pre>
+  <h4>Error</h4>
+  <pre>{{ job.error or "-" }}</pre>
+</section>
+
+<section class="card">
+  <h3>Inspect Raw</h3>
+  <details>
+    <summary>Request JSON</summary>
+    <pre>{{ job.request_json | tojson(indent=2) }}</pre>
+  </details>
+  <details>
+    <summary>Usage JSON</summary>
+    <pre>{{ job.usage_json | tojson(indent=2) if job.usage_json else "-" }}</pre>
+  </details>
+</section>
+
+<section class="card">
+  <h3>Save to Training Store</h3>
+  <form method="post" action="/runs/{{ job.id }}/save" class="stack">
+    <label class="label">Feedback (thumb_up / thumb_down / rating_5)</label>
+    <input type="text" name="feedback" />
+
+    <label class="label">Edited ideal output</label>
+    <textarea name="edited_ideal_output"></textarea>
+
+    <label class="label">Tags (comma-separated)</label>
+    <input type="text" name="tags" placeholder="support,policy" />
+
+    <label class="label">Save mode</label>
+    <select name="save_mode">
+      <option value="full">full</option>
+      <option value="redacted">redacted</option>
+    </select>
+
+    <label class="check">
+      <input type="checkbox" name="is_few_shot" /> Mark as few-shot example
+    </label>
+
+    <button type="submit" class="btn">Save training event</button>
+  </form>
+</section>
+{% endblock %}

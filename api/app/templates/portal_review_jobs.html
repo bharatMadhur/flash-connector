@@ -1,0 +1,64 @@
+{% extends "portal_base.html" %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Jobs</h2>
+    <span class="badge info">{{ jobs|length }} shown</span>
+  </div>
+  <form method="get" action="/portal/review/jobs" class="filters">
+    <label class="label">Status</label>
+    <select name="status_filter">
+      <option value="">all</option>
+      {% for value in ["queued","running","completed","failed","canceled"] %}
+      <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-secondary">Apply</button>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Status</th>
+          <th>Provider</th>
+          <th>Model</th>
+          <th>Created</th>
+          <th>Cost</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td><code>{{ job.id }}</code></td>
+          <td><code>{{ job.status.value }}</code></td>
+          <td><code>{{ job.provider_used or "-" }}</code></td>
+          <td><code>{{ job.model_used or "-" }}</code></td>
+          <td>{{ job.created_at }}</td>
+          <td>{{ "%.6f"|format(job.estimated_cost_usd) if job.estimated_cost_usd is not none else "-" }}</td>
+          <td><a href="/portal/review/jobs/{{ job.id }}">Review</a></td>
+        </tr>
+        {% endfor %}
+        {% if not jobs %}
+        <tr>
+          <td colspan="7" class="muted">No jobs found for this subtenant scope.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if can_export %}
+  <form method="post" action="/portal/review/training/export" class="stack">
+    <h3>Quick Export</h3>
+    <label class="label">Feedback filter</label>
+    <input type="text" name="feedback" placeholder="thumb_up" />
+    <label class="label">Tags (comma-separated)</label>
+    <input type="text" name="tags" placeholder="gold,support" />
+    <button type="submit" class="btn btn-secondary">Export JSONL</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

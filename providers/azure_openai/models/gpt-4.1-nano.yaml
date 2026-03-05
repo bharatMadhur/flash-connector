@@ -1,0 +1,30 @@
+model: gpt-4.1-nano
+display_name: GPT-4.1 Nano
+family: gpt-4.1
+category: chat
+supports_realtime: true
+supports_vision: false
+supports_tools: true
+notes: Azure OpenAI deployment using model-equivalent capabilities. If you use custom deployment names, map this capability profile and enter deployment name in target model field.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 32768
+    default: 512
+    description: Maximum output length.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.2
+    description: Controls response randomness.
+  top_p:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 1
+    description: Nucleus sampling control.

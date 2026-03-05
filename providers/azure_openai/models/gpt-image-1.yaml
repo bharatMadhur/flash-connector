@@ -1,0 +1,27 @@
+model: gpt-image-1
+display_name: GPT Image 1
+family: gpt-image
+category: image_generation
+supports_realtime: false
+supports_vision: true
+supports_tools: false
+notes: Azure image generation/edit model profile.
+parameters:
+  size:
+    supported: true
+    type: enum
+    values: [1024x1024, 1536x1024, 1024x1536]
+    default: 1024x1024
+    description: Output image size.
+  quality:
+    supported: true
+    type: enum
+    values: [standard, high]
+    default: standard
+    description: Generation quality level.
+  background:
+    supported: true
+    type: enum
+    values: [auto, transparent, opaque]
+    default: auto
+    description: Background style.

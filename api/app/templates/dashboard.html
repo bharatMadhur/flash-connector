@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="dashboard-hero">
+  <div class="dashboard-hero-main">
+    <p class="kicker">Control Plane</p>
+    <h2>Operations Command Center</h2>
+    <p class="muted small">
+      Production snapshot for runtime health, cost efficiency, and API reliability across your active tenant context.
+    </p>
+    <div class="hero-actions">
+      <a class="btn" href="/apis">Open APIs</a>
+      <a class="btn btn-secondary" href="/providers">Providers</a>
+      <a class="btn btn-secondary" href="/runs">Runs</a>
+      <a class="btn btn-secondary" href="/test-lab">Test Lab</a>
+    </div>
+    <div class="chip-row">
+      <span class="chip">Jobs 24h: {{ jobs_last_24h }}</span>
+      <span class="chip">Cache hit: {{ '%.1f'|format(cache_hit_rate_24h) }}%</span>
+      <span class="chip">Avg latency: {{ '%.0f'|format(avg_latency_ms) }} ms</span>
+      <span class="chip">Spend total: ${{ '%.6f'|format(spend_all_time) }}</span>
+    </div>
+  </div>
+  <aside class="dashboard-pulse">
+    <div class="dashboard-pulse-head">
+      <h3>System Pulse</h3>
+      {% if attention_items %}
+      <span class="badge warn">Attention {{ attention_items|length }}</span>
+      {% else %}
+      <span class="badge">Healthy</span>
+      {% endif %}
+    </div>
+    <div class="pulse-grid">
+      <article class="pulse-tile">
+        <p class="kicker">Queued</p>
+        <strong>{{ queued_jobs }}</strong>
+      </article>
+      <article class="pulse-tile">
+        <p class="kicker">Running</p>
+        <strong>{{ running_jobs }}</strong>
+      </article>
+      <article class="pulse-tile">
+        <p class="kicker">Completed 24h</p>
+        <strong>{{ completed_last_24h }}</strong>
+      </article>
+      <article class="pulse-tile">
+        <p class="kicker">Failed 24h</p>
+        <strong>{{ failed_last_24h }}</strong>
+      </article>
+    </div>
+  </aside>
+</section>
+
+<section class="stats-grid stats-grid-compact dashboard-stats">
+  <article class="stat-card">
+    <p class="kicker">Queue Depth</p>
+    <h2>{{ queue_size }}</h2>
+    <p class="muted small">Waiting in Redis queue</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">P95 Latency (24h)</p>
+    <h2>{{ '%.0f'|format(p95_latency_ms) }} ms</h2>
+    <p class="muted small">Completed jobs only</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Error Rate (24h)</p>
+    <h2>{{ '%.1f'|format(error_rate_24h) }}%</h2>
+    <p class="muted small">Failed / total jobs</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Cache Hit (24h)</p>
+    <h2>{{ '%.1f'|format(cache_hit_rate_24h) }}%</h2>
+    <p class="muted small">Response cache efficiency</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Live APIs</p>
+    <h2>{{ live_endpoint_count }}</h2>
+    <p class="muted small">Active versions receiving traffic</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Active API Keys</p>
+    <h2>{{ api_key_count }}</h2>
+    <p class="muted small">Currently usable keys</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Spend (24h)</p>
+    <h2>${{ '%.6f'|format(spend_last_24h) }}</h2>
+    <p class="muted small">Built-in estimate</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Batch Jobs (24h)</p>
+    <h2>{{ batch_jobs_24h }}</h2>
+    <p class="muted small">{{ batch_runs_24h }} batch run(s)</p>
+  </article>
+</section>
+
+<section class="grid-2">
+  <div class="card subtle-card">
+    <div class="card-head">
+      <h3>API Reliability Matrix</h3>
+      <span class="badge info">{{ endpoint_health|length }} APIs</span>
+    </div>
+    <div class="endpoint-health-grid">
+      {% for item in endpoint_health %}
+      {% set traffic_pct = (item.jobs_24h * 100 / (jobs_last_24h if jobs_last_24h else 1)) %}
+      <article class="endpoint-health-card">
+        <div class="endpoint-health-top">
+          <a href="{{ item.href }}"><strong>{{ item.name }}</strong></a>
+          {% if item.status == 'ok' %}
+          <span class="badge">healthy</span>
+          {% else %}
+          <span class="badge warn">attention</span>
+          {% endif %}
+        </div>
+        <p class="small muted">
+          <code>{{ item.live_version }}</code> · <code>{{ item.provider_model }}</code>
+        </p>
+        <div class="metric-row">
+          <span class="small muted">Traffic share</span>
+          <strong>{{ '%.1f'|format(traffic_pct) }}%</strong>
+        </div>
+        <div class="metric-track">
+          <span style="width: {{ '%.1f'|format(traffic_pct if traffic_pct <= 100 else 100) }}%"></span>
+        </div>
+        <div class="metric-row">
+          <span class="small muted">Failure rate</span>
+          <strong>{{ '%.1f'|format(item.failure_rate) }}%</strong>
+        </div>
+        <div class="metric-track danger">
+          <span style="width: {{ '%.1f'|format(item.failure_rate if item.failure_rate <= 100 else 100) }}%"></span>
+        </div>
+        <p class="small muted">24h jobs: {{ item.jobs_24h }} · failed: {{ item.failed_24h }}</p>
+        <p class="small muted">{{ item.status_reason }}</p>
+      </article>
+      {% endfor %}
+      {% if not endpoint_health %}
+      <p class="muted">No APIs found for this tenant.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card subtle-card">
+    <div class="card-head">
+      <h3>Attention Queue</h3>
+      <span class="badge warn">{{ attention_items|length }}</span>
+    </div>
+    {% if attention_items %}
+    <div class="setup-list">
+      {% for item in attention_items %}
+      <article class="setup-item">
+        <div class="setup-item-head">
+          <h4>{{ item.title }}</h4>
+        </div>
+        <p class="muted small">{{ item.detail }}</p>
+        <a href="{{ item.href }}" class="btn btn-secondary">Open</a>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No critical issues right now.</p>
+    {% endif %}
+    <hr />
+    <h4>Operator Notes</h4>
+    <ul class="list-tight muted small">
+      <li>Switch tenant scope from top-right tenant switcher for instant context change.</li>
+      <li>Use Deployments to verify model connectivity before publishing API versions.</li>
+      <li>Use Test Lab for same-input comparisons before production activation.</li>
+      <li>Use provider-native Batches for async bulk workloads at lower cost tiers.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <div class="card-head">
+      <h3>Recent Audit Activity</h3>
+      <a class="btn btn-secondary" href="/runs">Inspect Runtime</a>
+    </div>
+    <div class="list-pane">
+      {% for change in recent_changes %}
+      <p>
+        <strong>{{ change.action }}</strong>
+        <span class="small muted">{{ change.target_type }}{% if change.target_id %} · {{ change.target_id }}{% endif %}</span>
+        <br /><span class="small muted">{{ change.created_at }}</span>
+      </p>
+      {% endfor %}
+      {% if not recent_changes %}
+      <p class="muted small">No recent audit log entries.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Runtime Guarantees</h3>
+    <div class="chip-row">
+      <span class="chip">Async jobs correlated by <code>job_id</code></span>
+      <span class="chip">Sync endpoint available: <code>/responses</code></span>
+      <span class="chip">No hidden fallback routes</span>
+      <span class="chip">Training save is endpoint-scoped</span>
+      <span class="chip">Tenant isolation enforced per query</span>
+    </div>
+  </div>
+</section>
+{% endblock %}

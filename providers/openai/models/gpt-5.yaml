@@ -1,0 +1,38 @@
+model: gpt-5
+display_name: GPT-5
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: GPT-5 family prefers reasoning controls; sampling controls are restricted.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 200000
+    default: 1024
+    description: Upper bound on generated tokens.
+    increase_effect: Allows longer answers.
+    decrease_effect: Forces concise outputs.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Not supported on GPT-5 family except certain compatibility modes.
+  top_p:
+    supported: false
+    type: number
+    min: 0
+    max: 1
+    description: Not supported on GPT-5 family except certain compatibility modes.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [minimal, low, medium, high]
+    default: medium
+    description: Controls depth of reasoning.
+    increase_effect: Improves complex reasoning quality at higher latency/cost.
+    decrease_effect: Faster and cheaper but less depth.

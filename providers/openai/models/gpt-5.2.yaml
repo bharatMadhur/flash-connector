@@ -1,0 +1,38 @@
+model: gpt-5.2
+display_name: GPT-5.2
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Latest flagship GPT-5.2 model. Prefer reasoning controls over sampling controls.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 2048
+    description: Upper bound on generated tokens.
+    increase_effect: Allows more complete, multi-step answers.
+    decrease_effect: Forces concise outputs.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [minimal, low, medium, high]
+    default: medium
+    description: Controls depth of internal reasoning.
+    increase_effect: Better complex reasoning, higher latency/cost.
+    decrease_effect: Faster/cheaper, reduced depth.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Not supported for GPT-5.2 default reasoning mode.
+  top_p:
+    supported: false
+    type: number
+    min: 0
+    max: 1
+    description: Not supported for GPT-5.2 default reasoning mode.

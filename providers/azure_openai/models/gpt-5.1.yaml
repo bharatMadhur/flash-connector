@@ -1,0 +1,36 @@
+model: gpt-5.1
+display_name: GPT-5.1
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Azure GPT-5.1 model profile with optional compatibility sampling support.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 2048
+    description: Maximum output token count.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [none, minimal, low, medium, high]
+    default: medium
+    description: Reasoning depth control.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.2
+    description: Supported in compatible reasoning modes.
+  top_p:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 1
+    description: Supported in compatible reasoning modes.

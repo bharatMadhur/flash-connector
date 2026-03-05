@@ -1,0 +1,38 @@
+model: gpt-5-mini
+display_name: GPT-5 Mini
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Balanced GPT-5 variant.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 200000
+    default: 1024
+    description: Upper bound on generated tokens.
+    increase_effect: Allows longer outputs.
+    decrease_effect: Keeps responses short.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Not supported on GPT-5 family.
+  top_p:
+    supported: false
+    type: number
+    min: 0
+    max: 1
+    description: Not supported on GPT-5 family.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [minimal, low, medium, high]
+    default: medium
+    description: Adjusts reasoning depth.
+    increase_effect: Better chain-of-thought depth, slower responses.
+    decrease_effect: Faster responses for simple tasks.

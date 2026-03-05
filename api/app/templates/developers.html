@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-hero">
+  <div class="page-hero-grid">
+    <div class="hero-intro">
+      <p class="kicker">Developer Hub</p>
+      <h2>Production API docs + integration labs</h2>
+      <p class="muted small">One contract: submit async run, poll by <code>job_id</code>, save training, export datasets. Runtime behavior follows your configured provider connections.</p>
+      <div class="hero-actions">
+        <a class="btn" href="/playground">{% if session_user %}Open Playground{% else %}Sign In to Test{% endif %}</a>
+        <a class="btn btn-secondary" href="/docs" target="_blank" rel="noreferrer">Swagger UI</a>
+        <a class="btn btn-secondary" href="/openapi.json" target="_blank" rel="noreferrer">OpenAPI JSON</a>
+      </div>
+    </div>
+    <div class="hero-kpi-grid">
+      <article class="hero-kpi">
+        <p class="kicker">APIs</p>
+        <strong>{{ doc_stats.endpoint_count if session_user else '-' }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Active Keys</p>
+        <strong>{{ doc_stats.active_key_count if session_user else '-' }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Runs (24h)</p>
+        <strong>{{ runs_last_24h if session_user else '-' }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Mode</p>
+        <strong>Self-hosted</strong>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Quickstart Request</h3>
+    <button type="button" class="btn btn-secondary copy-btn" data-target="quickstart-submit">Copy submit command</button>
+  </div>
+  <pre id="quickstart-submit"><code>curl -s -X POST http://localhost:8000/v1/endpoints/{{ sample_endpoint_id }}/jobs \
+  -H "x-api-key: {{ sample_api_key }}" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: docs-quickstart-001" \
+  -d '{"input":"Say hello in one line","metadata":{"source":"docs"}}'</code></pre>
+  <div class="chip-row">
+    <span class="chip">Idempotent submit</span>
+    <span class="chip">Provider-native batch</span>
+    <span class="chip">Few-shot training</span>
+    <span class="chip">Sub-tenant attribution</span>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Setup Flow</h3>
+    <span class="badge info">{{ onboarding_steps|length }} steps</span>
+  </div>
+  <div class="dev-rail">
+    {% for item in onboarding_steps %}
+    <article>
+      <p class="kicker">Step {{ loop.index }}</p>
+      <h4>{{ item.title }}</h4>
+      <p class="muted small">{% if item.done %}Completed{% else %}Pending{% endif %}</p>
+      <a class="btn btn-secondary" href="{{ item.href }}">Open</a>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Public API Surface</h3>
+    <a class="btn btn-secondary" href="/docs" target="_blank" rel="noreferrer">View full schema</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Method</th>
+          <th>Path</th>
+          <th>Auth</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in public_api_reference %}
+        <tr>
+          <td><code>{{ item.method }}</code></td>
+          <td><code>{{ item.path }}</code></td>
+          <td>{{ item.auth }}</td>
+          <td>{{ item.purpose }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Python Labs</h3>
+    <button type="button" class="btn btn-secondary copy-btn" id="copy-active-lab">Copy active lab</button>
+  </div>
+  <div class="code-tabs" id="dev-lab-tabs">
+    <button type="button" data-code="lab-async" class="active">Async Run</button>
+    <button type="button" data-code="lab-idem">Idempotent Retry</button>
+    <button type="button" data-code="lab-batch">Batch Flex</button>
+    <button type="button" data-code="lab-training">Training Save</button>
+    <button type="button" data-code="lab-subtenant">Sub-tenant</button>
+  </div>
+  <pre class="code-panel active" data-code-panel="lab-async"><code>from sdk import FlashConnectorClient
+
+with FlashConnectorClient(base_url="http://localhost:8000", api_key="{{ sample_api_key }}") as client:
+    submission = client.submit_job(
+        "{{ sample_endpoint_id }}",
+        input_text="Draft one-line status summary",
+        metadata={"source": "docs", "lab": "async"},
+    )
+    job = client.wait_for_job(submission.job_id, timeout_seconds=180)
+    print(job.status, job.result_text)</code></pre>
+  <pre class="code-panel" data-code-panel="lab-idem"><code>from sdk import FlashConnectorClient
+
+idem = "docs-idem-001"
+with FlashConnectorClient(base_url="http://localhost:8000", api_key="{{ sample_api_key }}") as client:
+    first = client.submit_job("{{ sample_endpoint_id }}", input_text="Summarize incident", idempotency_key=idem)
+    second = client.submit_job("{{ sample_endpoint_id }}", input_text="Summarize incident", idempotency_key=idem)
+    print(first.job_id, second.job_id)</code></pre>
+  <pre class="code-panel" data-code-panel="lab-batch"><code>from sdk import FlashConnectorClient
+
+with FlashConnectorClient(base_url="http://localhost:8000", api_key="{{ sample_api_key }}") as client:
+    batch = client.submit_batch(
+        "{{ sample_endpoint_id }}",
+        inputs=["Classify ticket A", "Classify ticket B", "Classify ticket C"],
+        service_tier="flex",
+        batch_name="docs-flex-batch",
+        metadata={"source": "docs", "lab": "batch"},
+    )
+    detail = client.wait_for_batch(batch.batch_id, timeout_seconds=7200)
+    print(detail.status, detail.completed_jobs, detail.failed_jobs)</code></pre>
+  <pre class="code-panel" data-code-panel="lab-training"><code>from sdk import FlashConnectorClient
+
+with FlashConnectorClient(base_url="http://localhost:8000", api_key="{{ sample_api_key }}") as client:
+    job = client.submit_and_wait("{{ sample_endpoint_id }}", input_text="Draft refund response")
+    event = client.save_training(
+        job.id,
+        feedback="thumb_up",
+        tags=["refunds", "production"],
+        is_few_shot=True,
+    )
+    print(event.id, event.is_few_shot)</code></pre>
+  <pre class="code-panel" data-code-panel="lab-subtenant"><code>from sdk import FlashConnectorClient
+
+with FlashConnectorClient(base_url="http://localhost:8000", api_key="{{ sample_api_key }}") as client:
+    submission = client.submit_job(
+        "{{ sample_endpoint_id }}",
+        input_text="Generate onboarding note",
+        subtenant_code="ACME-TEAM-A",
+        metadata={"source": "docs", "lab": "subtenant"},
+    )
+    job = client.wait_for_job(submission.job_id)
+    print(job.subtenant_code, job.estimated_cost_usd)</code></pre>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>SDK Methods</h3>
+    <ul class="list-tight">
+      {% for item in sdk_reference %}
+      <li><code>{{ item.method }}</code> — {{ item.purpose }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  <section class="card">
+    <h3>Error Guide</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Cause</th>
+            <th>Recovery</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in error_reference %}
+          <tr>
+            <td><code>{{ item.code }}</code></td>
+            <td>{{ item.cause }}</td>
+            <td>{{ item.fix }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Provider Documentation</h3>
+    <a class="btn btn-secondary" href="/providers">Open providers</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Slug</th>
+          <th>Default Model</th>
+          <th>Model Count</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for provider in providers %}
+        <tr>
+          <td>{{ provider.name }}</td>
+          <td><code>{{ provider.slug }}</code></td>
+          <td><code>{{ provider.default_model }}</code></td>
+          <td>{{ provider.model_count }}</td>
+          <td>
+            <a href="{{ provider.docs_url }}" target="_blank" rel="noreferrer">API Docs</a>
+            {% if provider.realtime_docs_url %} · <a href="{{ provider.realtime_docs_url }}" target="_blank" rel="noreferrer">Realtime Docs</a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+  (() => {
+    const tabs = document.getElementById("dev-lab-tabs");
+    if (tabs) {
+      const buttons = Array.from(tabs.querySelectorAll("button[data-code]"));
+      const panels = Array.from(document.querySelectorAll(".code-panel[data-code-panel]"));
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const key = button.getAttribute("data-code");
+          buttons.forEach((item) => item.classList.remove("active"));
+          button.classList.add("active");
+          panels.forEach((panel) => {
+            panel.classList.toggle("active", panel.getAttribute("data-code-panel") === key);
+          });
+        });
+      });
+    }
+
+    document.querySelectorAll(".copy-btn").forEach((button) => {
+      button.addEventListener("click", async () => {
+        let target = null;
+        if (button.id === "copy-active-lab") {
+          target = document.querySelector(".code-panel.active");
+        } else {
+          const targetId = button.getAttribute("data-target");
+          target = targetId ? document.getElementById(targetId) : null;
+        }
+        if (!target) return;
+        const previous = button.textContent;
+        try {
+          await navigator.clipboard.writeText(target.textContent || "");
+          button.textContent = "Copied";
+        } catch (_err) {
+          button.textContent = "Copy failed";
+        }
+        setTimeout(() => {
+          button.textContent = previous;
+        }, 1200);
+      });
+    });
+  })();
+</script>
+{% endblock %}

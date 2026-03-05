@@ -1,0 +1,15 @@
+model: text-embedding-ada-002
+display_name: text-embedding-ada-002
+family: text-embedding
+category: embeddings
+supports_realtime: false
+supports_vision: false
+supports_tools: false
+notes: Legacy embedding model for backward compatibility.
+parameters:
+  encoding_format:
+    supported: true
+    type: enum
+    values: [float, base64]
+    default: float
+    description: Output encoding format.

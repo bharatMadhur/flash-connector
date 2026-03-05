@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="hero-head">
+    <div>
+      <p class="kicker">Guided Build</p>
+      <h2>Create API + Key in Minutes</h2>
+      <p class="muted small">Recommended flow: connect provider, create API, create key. Model deployments are optional and advanced.</p>
+    </div>
+    <div class="chip-row compact">
+      <span class="chip">Deployments: {{ deployments|length }}</span>
+      <span class="chip">APIs: {{ endpoints|length }}</span>
+      <span class="chip">Active keys: {{ keys|selectattr("is_active")|list|length }}</span>
+    </div>
+  </div>
+  {% if builder_flash %}
+  <div class="flash">{{ builder_flash }}</div>
+  {% endif %}
+  {% if provider_flash %}
+  <div class="flash">{{ provider_flash }}</div>
+  {% endif %}
+  {% if deployment_flash %}
+  <div class="flash">{{ deployment_flash }}</div>
+  {% endif %}
+  {% if new_api_key %}
+  <div class="flash">
+    New key created: <code>{{ new_api_key.value }}</code>
+    <span class="muted small">Copy now. It is shown only once.</span>
+  </div>
+  {% endif %}
+</section>
+
+<div class="grid-3">
+  <section class="card">
+    <div class="card-head">
+      <h3>0. Optional Deployment Preset</h3>
+      <a class="btn btn-secondary" href="/providers">Manage Providers</a>
+    </div>
+    <p class="muted small">Only use this if you want reusable verified model deployments across multiple APIs. You can skip this and configure model directly in API versions.</p>
+    {% if not ready_connections %}
+    <div class="flash warn">No ready provider connections. Configure <a href="/providers">Providers</a> first.</div>
+    {% endif %}
+    <form id="builder-deployment-form" method="post" action="/deployments/create" class="stack">
+      <input type="hidden" name="next_url" value="/builder" />
+
+      <label class="label">Name</label>
+      <input type="text" name="name" placeholder="support-prod-openai" required />
+
+      <label class="label">Connection</label>
+      <select name="provider_config_id" id="builder-connection-select" required>
+        {% if not ready_connections %}
+        <option value="">No ready connections</option>
+        {% endif %}
+        {% for config in ready_connections %}
+        <option value="{{ config.id }}" data-provider="{{ config.provider_slug }}">
+          {{ config.name }} ({{ config.provider_slug }}){% if config.is_default %} • default{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Model</label>
+      <select name="model_identifier" id="builder-model-select" required></select>
+      <label class="check"><input type="checkbox" id="builder-model-custom-toggle" /> Use custom model/deployment id</label>
+      <input type="text" name="model_identifier_custom" id="builder-model-custom" placeholder="your-deployment-name" style="display:none;" />
+
+      <input type="hidden" name="capability_profile" value="responses_chat" />
+      <div class="card subtle-card">
+        <h4>Model Parameters</h4>
+        <div id="builder-model-params-controls" class="stack"></div>
+      </div>
+      <input type="hidden" name="params_json" id="builder-params-json" value="{}" />
+
+      <label class="check"><input type="checkbox" name="verify_now" checked /> Verify after create</label>
+      <label class="check"><input type="checkbox" name="is_active" checked /> Enabled</label>
+      <button type="submit" class="btn" {% if not ready_connections %}disabled{% endif %}>Create Deployment</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h3>1. Create API</h3>
+      <a class="btn btn-secondary" href="/apis">Open APIs</a>
+    </div>
+    <p class="muted small">API defines your public surface. Prompt versions are added on the API detail page.</p>
+    <form method="post" action="/apis/create" class="stack">
+      <input type="hidden" name="next_url" value="/builder" />
+      <label class="label">Name</label>
+      <input type="text" name="name" placeholder="customer-support" required />
+      <label class="label">Description</label>
+      <input type="text" name="description" placeholder="Customer support assistant API" />
+      <button type="submit" class="btn">Create API</button>
+    </form>
+    <hr />
+    <h4>Recent APIs</h4>
+    <div class="list-pane">
+      {% for endpoint in endpoints[:8] %}
+      <p>
+        <a href="/apis/{{ endpoint.id }}"><strong>{{ endpoint.name }}</strong></a>
+        <br /><code>{{ endpoint.id }}</code>
+      </p>
+      {% endfor %}
+      {% if not endpoints %}
+      <p class="muted small">No APIs yet.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <h3>2. Create API Key</h3>
+      <a class="btn btn-secondary" href="/api-keys">Open API Keys</a>
+    </div>
+    <p class="muted small">Issue a virtual key clients can use with <code>x-api-key</code>.</p>
+    <form method="post" action="/api-keys/create" class="stack">
+      <input type="hidden" name="next_url" value="/builder" />
+      <label class="label">Key name</label>
+      <input type="text" name="name" placeholder="frontend-prod-key" required />
+
+      <label class="label">Scope</label>
+      <select name="scope_mode" id="builder-scope-mode">
+        <option value="all">All APIs</option>
+        <option value="selected">Selected API(s)</option>
+      </select>
+      <select name="endpoint_ids" id="builder-endpoint-select" multiple size="4" style="display:none;">
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}">{{ endpoint.name }} ({{ endpoint.id }})</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Rate limit / min</label>
+      <input type="number" name="rate_limit_per_min" min="1" value="60" />
+      <label class="label">Monthly quota</label>
+      <input type="number" name="monthly_quota" min="1" value="10000" />
+      <button type="submit" class="btn">Create API Key</button>
+    </form>
+    <hr />
+    <h4>Recent Keys</h4>
+    <div class="list-pane">
+      {% for key in keys[:8] %}
+      <p>
+        <strong>{{ key.name }}</strong>
+        {% if key.is_active %}<span class="badge">active</span>{% else %}<span class="badge warn">inactive</span>{% endif %}
+        <br /><code>{{ key.key_prefix }}</code>
+      </p>
+      {% endfor %}
+      {% if not keys %}
+      <p class="muted small">No keys yet.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const providerModels = {{ provider_models_json | safe }};
+    const providerParams = {{ provider_params_json | safe }};
+    const connectionSelect = document.getElementById("builder-connection-select");
+    const deploymentForm = document.getElementById("builder-deployment-form");
+    const modelSelect = document.getElementById("builder-model-select");
+    const modelCustomToggle = document.getElementById("builder-model-custom-toggle");
+    const modelCustom = document.getElementById("builder-model-custom");
+    const modelParamsControls = document.getElementById("builder-model-params-controls");
+    const paramsJsonInput = document.getElementById("builder-params-json");
+    const scopeMode = document.getElementById("builder-scope-mode");
+    const endpointSelect = document.getElementById("builder-endpoint-select");
+    let activeParamSpecs = [];
+
+    function sanitizeId(key) {
+      return String(key || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function selectedProvider() {
+      if (!connectionSelect) return "";
+      const option = connectionSelect.options[connectionSelect.selectedIndex];
+      if (!option) return "";
+      return option.getAttribute("data-provider") || "";
+    }
+
+    function selectedModel() {
+      if (modelSelect.value === "__custom__") {
+        return (modelCustom.value || "").trim();
+      }
+      return modelSelect.value;
+    }
+
+    function syncCustomMode() {
+      const custom = modelSelect.value === "__custom__";
+      modelCustomToggle.checked = custom;
+      modelCustom.style.display = custom ? "block" : "none";
+      modelCustom.required = custom;
+    }
+
+    function renderModelParams() {
+      const provider = selectedProvider();
+      const model = selectedModel();
+      const allParams = (providerParams[provider] || {})[model] || [];
+      activeParamSpecs = allParams.filter((item) => item.supported);
+
+      if (activeParamSpecs.length === 0) {
+        modelParamsControls.innerHTML = '<p class="small muted">No configurable parameters declared for this model.</p>';
+        return;
+      }
+
+      const html = activeParamSpecs.map((spec) => {
+        const inputId = `builder-param-${sanitizeId(spec.key)}`;
+        const defaultValue = spec.default !== null && spec.default !== undefined ? spec.default : "";
+        if (spec.type === "enum") {
+          const options = (spec.values || []).map((item) => `<option value="${item}" ${String(item) === String(defaultValue) ? "selected" : ""}>${item}</option>`).join("");
+          return `
+            <label class="label">${spec.key}</label>
+            <select id="${inputId}" data-param-key="${spec.key}" data-param-type="enum">${options}</select>
+            <p class="small muted">${spec.description || ""}</p>
+          `;
+        }
+        if (spec.type === "integer" || spec.type === "number") {
+          const step = spec.type === "integer" ? "1" : "0.01";
+          const minAttr = spec.min !== null ? `min="${spec.min}"` : "";
+          const maxAttr = spec.max !== null ? `max="${spec.max}"` : "";
+          return `
+            <label class="label">${spec.key}</label>
+            <input id="${inputId}" type="number" step="${step}" ${minAttr} ${maxAttr} value="${defaultValue}" data-param-key="${spec.key}" data-param-type="${spec.type}" required />
+            <p class="small muted">${spec.description || ""}</p>
+          `;
+        }
+        if (spec.type === "boolean") {
+          const checked = defaultValue ? "checked" : "";
+          return `
+            <label class="check"><input id="${inputId}" type="checkbox" ${checked} data-param-key="${spec.key}" data-param-type="boolean" /> ${spec.key}</label>
+            <p class="small muted">${spec.description || ""}</p>
+          `;
+        }
+        return `
+          <label class="label">${spec.key}</label>
+          <input id="${inputId}" type="text" value="${defaultValue}" data-param-key="${spec.key}" data-param-type="string" />
+          <p class="small muted">${spec.description || ""}</p>
+        `;
+      }).join("");
+
+      modelParamsControls.innerHTML = html;
+    }
+
+    function collectModelParams() {
+      const output = {};
+      for (const spec of activeParamSpecs) {
+        const inputId = `builder-param-${sanitizeId(spec.key)}`;
+        const element = document.getElementById(inputId);
+        if (!element) continue;
+        let value = null;
+        if (spec.type === "boolean") {
+          value = element.checked;
+        } else if (spec.type === "integer") {
+          value = parseInt(element.value, 10);
+          if (!Number.isFinite(value)) throw new Error(`${spec.key} must be an integer.`);
+        } else if (spec.type === "number") {
+          value = parseFloat(element.value);
+          if (!Number.isFinite(value)) throw new Error(`${spec.key} must be a number.`);
+        } else {
+          value = String(element.value || "").trim();
+          if (!value) throw new Error(`${spec.key} is required.`);
+        }
+        if ((spec.type === "integer" || spec.type === "number") && spec.min !== null && value < spec.min) {
+          throw new Error(`${spec.key} must be >= ${spec.min}.`);
+        }
+        if ((spec.type === "integer" || spec.type === "number") && spec.max !== null && value > spec.max) {
+          throw new Error(`${spec.key} must be <= ${spec.max}.`);
+        }
+        if (spec.type === "enum" && Array.isArray(spec.values) && spec.values.length > 0 && !spec.values.includes(value)) {
+          throw new Error(`${spec.key} must be one of: ${spec.values.join(", ")}.`);
+        }
+        if (spec.key === "reasoning_effort") {
+          output.reasoning = { effort: String(value) };
+        } else {
+          output[spec.key] = value;
+        }
+      }
+      return output;
+    }
+
+    function refreshModels() {
+      const provider = selectedProvider();
+      const models = providerModels[provider] || [];
+      while (modelSelect.firstChild) modelSelect.removeChild(modelSelect.firstChild);
+      models.forEach((model) => {
+        const option = document.createElement("option");
+        option.value = model;
+        option.textContent = model;
+        modelSelect.appendChild(option);
+      });
+      const customOption = document.createElement("option");
+      customOption.value = "__custom__";
+      customOption.textContent = "Custom model/deployment...";
+      modelSelect.appendChild(customOption);
+      if (models.length > 0) {
+        modelSelect.value = models[0];
+      } else {
+        modelSelect.value = "__custom__";
+      }
+      syncCustomMode();
+      renderModelParams();
+    }
+
+    function refreshScope() {
+      const selected = scopeMode.value === "selected";
+      endpointSelect.style.display = selected ? "block" : "none";
+      endpointSelect.required = selected;
+    }
+
+    if (connectionSelect) {
+      connectionSelect.addEventListener("change", refreshModels);
+      refreshModels();
+    }
+    if (modelSelect) {
+      modelSelect.addEventListener("change", () => {
+        syncCustomMode();
+        renderModelParams();
+      });
+    }
+    if (modelCustomToggle) {
+      modelCustomToggle.addEventListener("change", () => {
+        if (modelCustomToggle.checked) {
+          modelSelect.value = "__custom__";
+        } else if (modelSelect.options.length > 1) {
+          modelSelect.value = modelSelect.options[0].value;
+        }
+        syncCustomMode();
+        renderModelParams();
+      });
+    }
+    if (modelCustom) {
+      modelCustom.addEventListener("input", renderModelParams);
+    }
+    if (deploymentForm) {
+      deploymentForm.addEventListener("submit", (event) => {
+        try {
+          paramsJsonInput.value = JSON.stringify(collectModelParams());
+        } catch (error) {
+          event.preventDefault();
+          alert(error.message || "Invalid model parameter value.");
+        }
+      });
+    }
+    if (scopeMode) {
+      scopeMode.addEventListener("change", refreshScope);
+      refreshScope();
+    }
+  })();
+</script>
+{% endblock %}

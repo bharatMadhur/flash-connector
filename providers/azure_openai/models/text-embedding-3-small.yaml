@@ -1,0 +1,22 @@
+model: text-embedding-3-small
+display_name: text-embedding-3-small
+family: text-embedding-3
+category: embeddings
+supports_realtime: false
+supports_vision: false
+supports_tools: false
+notes: Azure cost-efficient embedding model.
+parameters:
+  dimensions:
+    supported: true
+    type: integer
+    min: 128
+    max: 1536
+    default: 1536
+    description: Optional output vector dimensionality.
+  encoding_format:
+    supported: true
+    type: enum
+    values: [float, base64]
+    default: float
+    description: Output encoding format.

@@ -1,0 +1,28 @@
+model: gpt-5.1-codex-max
+display_name: GPT-5.1 Codex Max
+family: gpt-5-codex
+category: coding
+supports_realtime: true
+supports_vision: false
+supports_tools: true
+notes: Highest-quality GPT-5.1 codex profile in Azure catalog.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 4096
+    description: Maximum output token length.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [low, medium, high]
+    default: high
+    description: Reasoning depth for coding tasks.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Unsupported for default codex reasoning mode.

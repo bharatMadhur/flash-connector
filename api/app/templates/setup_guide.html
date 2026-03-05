@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="hero-head">
+    <div>
+      <p class="kicker">Onboarding</p>
+      <h2>Setup Guide</h2>
+      <p class="muted small">Follow these steps in order to ship your first production endpoint.</p>
+    </div>
+    <div class="hero-actions">
+      <a class="btn" href="/builder">Open Build API</a>
+      <a class="btn btn-secondary" href="/dashboard">Back to Dashboard</a>
+    </div>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h3>Progress</h3>
+      <span class="badge info">{{ setup_done }}/{{ setup_steps|length }} complete</span>
+    </div>
+    <div class="setup-progress">
+      <div class="setup-progress-fill" style="width: {{ (setup_done / (setup_steps|length if setup_steps|length else 1) * 100) | round(0, 'floor') }}%;"></div>
+    </div>
+    <div class="setup-list">
+      {% for step in setup_steps %}
+      <article class="setup-item {% if step.done %}done{% endif %}">
+        <div class="setup-item-head">
+          <h4>{{ loop.index }}. {{ step.title }}</h4>
+          {% if step.done %}
+          <span class="badge">Done</span>
+          {% else %}
+          <span class="badge info">Pending</span>
+          {% endif %}
+        </div>
+        <p class="muted small">{{ step.description }}</p>
+        <a href="{{ step.href }}" class="btn btn-secondary">Open</a>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>First API Call</h3>
+    <p class="muted small">After completing setup, submit jobs and poll by `job_id`.</p>
+    <pre><code>curl -X POST http://localhost:8000/v1/endpoints/&lt;endpoint_id&gt;/jobs \\
+  -H \"x-api-key: fc_xxx\" \\
+  -H \"content-type: application/json\" \\
+  -d '{\"input\":\"Hello\"}'\n\ncurl http://localhost:8000/v1/jobs/&lt;job_id&gt; \\
+  -H \"x-api-key: fc_xxx\"</code></pre>
+    <div class="chip-row">
+      <span class="chip">Jobs in last 24h: {{ jobs_last_24h }}</span>
+    </div>
+  </section>
+</div>
+{% endblock %}

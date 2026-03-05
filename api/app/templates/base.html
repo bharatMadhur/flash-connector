@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>flash-connector</title>
+    <meta name="csrf-token" content="{{ csrf_token or '' }}" />
+    <link
+      id="theme-favicon"
+      rel="icon"
+      type="image/svg+xml"
+      href="/static/favicon.svg?v=20260305-6"
+      data-icon-light="/static/favicon.svg?v=20260305-6"
+      data-icon-dark="/static/favicon-dark.svg?v=20260305-1"
+    />
+    <script>
+      (() => {
+        try {
+          const storedTheme = localStorage.getItem("fc-theme");
+          if (storedTheme === "dark") {
+            document.documentElement.setAttribute("data-theme", "dark");
+          } else if (!storedTheme && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.setAttribute("data-theme", "dark");
+          }
+        } catch (_err) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/style.css?v=20260305-2" />
+  </head>
+  <body>
+    {% set nav_titles = {
+      'dashboard': 'Dashboard',
+      'builder': 'Quick Build',
+      'providers': 'Providers',
+      'deployments': 'Model Deployments',
+      'endpoints': 'APIs',
+      'apis': 'APIs',
+      'playground': 'Playground',
+      'api-keys': 'API Keys',
+      'jobs': 'Runs',
+      'runs': 'Runs',
+      'batches': 'Batches',
+      'test-lab': 'Test Lab',
+      'training': 'Training',
+      'developers': 'Developer Hub',
+      'setup-guide': 'Setup Guide',
+      'portal': 'Sub-tenant Portal',
+      'usage-costs': 'Usage & Costs',
+      'personas': 'Personas',
+      'contexts': 'Context Blocks',
+      'tenants': 'Tenants',
+      'users': 'Users',
+      'settings': 'Settings',
+      'pricing': 'Pricing'
+    } %}
+    {% set nav_subtitles = {
+      'dashboard': 'Live operational view across queue health, endpoint reliability, and tenant spend.',
+      'builder': 'Create provider connection, API, and key in one guided flow.',
+      'providers': 'Connect provider credentials, validate connectivity, and manage defaults.',
+      'deployments': 'Optional reusable model deployments for routing and verification workflows.',
+      'endpoints': 'Version prompts safely and control what goes live for production traffic.',
+      'apis': 'Version prompts safely and control what goes live for production traffic.',
+      'playground': 'Estimate token/cost impact, run public API calls, and copy curl/SDK snippets.',
+      'api-keys': 'Issue virtual keys with scoped API access and usage controls.',
+      'jobs': 'Inspect async run execution, model usage, and response outcomes.',
+      'runs': 'Inspect async run execution, model usage, and response outcomes.',
+      'batches': 'Run provider-native async batches and monitor run completion.',
+      'test-lab': 'Compare models/providers side-by-side before publishing versions.',
+      'training': 'Curate fine-tuning datasets with feedback, tags, and few-shot selection.',
+      'developers': 'Integration reference, SDK examples, and operational API playbooks.'
+    } %}
+    {% set page_title = nav_titles.get(active_nav, active_nav.replace('-', ' ').title() if active_nav else 'Console') %}
+    {% set page_subtitle = nav_subtitles.get(active_nav, 'Tenant-scoped control plane for prompts, models, keys, async jobs, and training exports.') %}
+
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand-wrap">
+          <div class="brand-row">
+            <div class="brand-icon">
+              <img
+                src="/static/logo-fc.svg?v=20260305-6"
+                alt="flash-connector logo"
+                class="brand-logo"
+                data-logo-light="/static/logo-fc.svg?v=20260305-6"
+                data-logo-dark="/static/logo-fc-dark.svg?v=20260305-1"
+              />
+            </div>
+            <div>
+              <div class="brand">flash-connector</div>
+              <p class="muted small">Prompt Endpoint Platform</p>
+            </div>
+          </div>
+        </div>
+
+        <a href="{{ '/builder' if nav_has_ready_providers else '/providers' }}" class="btn sidebar-quick">
+          {{ 'Create API Stack' if nav_has_ready_providers else 'Connect Provider' }}
+        </a>
+
+        <nav class="nav-stack">
+          <p class="nav-label">Core</p>
+          <a href="/dashboard" class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}">Dashboard</a>
+          <a href="/providers" class="nav-link {% if active_nav == 'providers' %}active{% endif %}">Providers</a>
+          <a href="/apis" class="nav-link {% if active_nav in ['apis', 'endpoints'] %}active{% endif %}">APIs</a>
+          <a href="/api-keys" class="nav-link {% if active_nav == 'api-keys' %}active{% endif %}">API Keys</a>
+          <a href="/runs" class="nav-link {% if active_nav in ['runs', 'jobs'] %}active{% endif %}">Runs</a>
+          <a href="/training" class="nav-link {% if active_nav == 'training' %}active{% endif %}">Training</a>
+          <a href="/playground" class="nav-link {% if active_nav == 'playground' %}active{% endif %}">Playground</a>
+          <a href="/developers" class="nav-link {% if active_nav == 'developers' %}active{% endif %}">Developer Hub</a>
+
+          {% set advanced_nav = ['builder', 'deployments', 'batches', 'test-lab', 'portal', 'personas', 'contexts', 'tenants', 'users', 'settings', 'setup-guide', 'usage-costs'] %}
+          <div class="nav-label">Advanced</div>
+          <details class="nav-details" {% if active_nav in advanced_nav %}open{% endif %}>
+            <summary>Tools</summary>
+            <div class="nav-details-list">
+              <a href="/builder" class="nav-link {% if active_nav == 'builder' %}active{% endif %}">Quick Build</a>
+              <a href="/deployments" class="nav-link {% if active_nav == 'deployments' %}active{% endif %}">Model Deployments</a>
+              <a href="/batches" class="nav-link {% if active_nav == 'batches' %}active{% endif %}">Batches</a>
+              <a href="/test-lab" class="nav-link {% if active_nav == 'test-lab' %}active{% endif %}">Test Lab</a>
+              <a href="/usage-costs" class="nav-link {% if active_nav == 'usage-costs' %}active{% endif %}">Usage & Costs</a>
+              <a href="/setup-guide" class="nav-link {% if active_nav == 'setup-guide' %}active{% endif %}">Setup Guide</a>
+              <a href="/portal" class="nav-link {% if active_nav == 'portal' %}active{% endif %}">Sub-tenant Portal</a>
+              <a href="/personas" class="nav-link {% if active_nav == 'personas' %}active{% endif %}">Personas</a>
+              <a href="/contexts" class="nav-link {% if active_nav == 'contexts' %}active{% endif %}">Context Blocks</a>
+              <a href="/tenants" class="nav-link {% if active_nav == 'tenants' %}active{% endif %}">Tenants</a>
+              <a href="/users" class="nav-link {% if active_nav == 'users' %}active{% endif %}">Users</a>
+              <a href="/settings" class="nav-link {% if active_nav == 'settings' %}active{% endif %}">Settings</a>
+            </div>
+          </details>
+        </nav>
+
+        <div class="sidebar-footer">
+          <a class="btn btn-secondary" href="/docs">API Docs</a>
+          <form class="logout-form" method="post" action="/logout">
+            <button type="submit" class="btn btn-secondary">Logout</button>
+          </form>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="topbar-left">
+            <h1 class="topbar-title">{{ page_title }}</h1>
+            <p class="muted small topbar-subtitle">{{ page_subtitle }}</p>
+            {% if tenant_breadcrumb %}
+            <p class="muted small">Context:
+              {% for crumb in tenant_breadcrumb %}
+              <code>{{ crumb.name }}</code>{% if not loop.last %} / {% endif %}
+              {% endfor %}
+            </p>
+            {% endif %}
+          </div>
+          <div class="topbar-right">
+            <div class="stack-inline">
+              <button type="button" class="btn btn-secondary btn-compact" id="theme-toggle">Dark mode</button>
+            </div>
+            <div class="topbar-meta">
+              <span class="pill">User: {{ (session_user.display_name or session_user.email) if session_user else '-' }}</span>
+              <span class="pill">Tenant: {{ tenant_name or 'Unknown' }}</span>
+              <span class="pill">Role: {{ session_user.role if session_user else '-' }}</span>
+            </div>
+            {% if accessible_tenants and accessible_tenants|length > 1 %}
+            <form class="topbar-switch" method="post" action="/tenant-context/switch">
+              <select name="tenant_id">
+                {% for tenant in accessible_tenants %}
+                <option value="{{ tenant.id }}" {% if active_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-secondary">Switch Tenant</button>
+            </form>
+            {% endif %}
+          </div>
+        </header>
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+    <script>
+      (() => {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
+        const unsafeMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+        function appendCsrfToForms() {
+          if (!csrfToken) return;
+          const forms = document.querySelectorAll("form[method]");
+          forms.forEach((form) => {
+            const method = String(form.getAttribute("method") || "GET").toUpperCase();
+            if (!unsafeMethods.has(method)) return;
+            if (form.querySelector('input[name="csrf_token"]')) return;
+            const field = document.createElement("input");
+            field.type = "hidden";
+            field.name = "csrf_token";
+            field.value = csrfToken;
+            form.appendChild(field);
+          });
+        }
+
+        function patchFetchWithCsrf() {
+          if (!csrfToken || typeof window.fetch !== "function") return;
+          const originalFetch = window.fetch.bind(window);
+          window.fetch = (input, init = {}) => {
+            const options = init || {};
+            const method = String(options.method || "GET").toUpperCase();
+            if (!unsafeMethods.has(method)) {
+              return originalFetch(input, options);
+            }
+
+            const url = typeof input === "string" ? input : input?.url;
+            const isRelative = typeof url === "string" && !/^https?:\/\//i.test(url);
+            const isSameOrigin = typeof url === "string" && url.startsWith(window.location.origin);
+            if (isRelative || isSameOrigin) {
+              const headers = new Headers(options.headers || {});
+              if (!headers.has("x-csrf-token")) {
+                headers.set("x-csrf-token", csrfToken);
+              }
+              options.headers = headers;
+            }
+
+            return originalFetch(input, options);
+          };
+        }
+
+        appendCsrfToForms();
+        patchFetchWithCsrf();
+
+        const root = document.documentElement;
+        const toggle = document.getElementById("theme-toggle");
+        if (!toggle) return;
+        function syncBrandAssets(theme) {
+          const logos = document.querySelectorAll("img.brand-logo[data-logo-light][data-logo-dark]");
+          logos.forEach((img) => {
+            const light = img.getAttribute("data-logo-light") || "";
+            const dark = img.getAttribute("data-logo-dark") || light;
+            img.setAttribute("src", theme === "dark" ? dark : light);
+          });
+          const favicon = document.getElementById("theme-favicon");
+          if (favicon) {
+            const light = favicon.getAttribute("data-icon-light") || "";
+            const dark = favicon.getAttribute("data-icon-dark") || light;
+            favicon.setAttribute("href", theme === "dark" ? dark : light);
+          }
+        }
+        function applyTheme(theme) {
+          if (theme === "dark") {
+            root.setAttribute("data-theme", "dark");
+            toggle.textContent = "Light mode";
+          } else {
+            root.removeAttribute("data-theme");
+            toggle.textContent = "Dark mode";
+          }
+          syncBrandAssets(theme);
+        }
+        const initial = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+        applyTheme(initial);
+        toggle.addEventListener("click", () => {
+          const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+          applyTheme(next);
+          localStorage.setItem("fc-theme", next);
+        });
+      })();
+    </script>
+  </body>
+</html>

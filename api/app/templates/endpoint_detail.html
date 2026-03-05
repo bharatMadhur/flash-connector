@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="card-head">
+    <div>
+      <p class="kicker">API Workspace</p>
+      <h2>{{ endpoint.name }}</h2>
+      <p class="muted small">{{ endpoint.description or "No description" }}</p>
+    </div>
+    <div class="stack-inline">
+      <span class="pill">API ID: <code>{{ endpoint.id }}</code></span>
+      <span class="pill">Live Configuration: <code>{{ endpoint.active_version_id or "none" }}</code></span>
+      <button type="button" class="btn btn-secondary" id="copy-endpoint-id">Copy API ID</button>
+      <a class="btn btn-secondary" href="/api-keys">Create API Key</a>
+    </div>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h3>Versions</h3>
+      <span class="badge">{{ versions|length }}</span>
+    </div>
+
+    {% if versions %}
+      {% for version in versions %}
+      <article class="version-card">
+        <div class="version-top">
+          <div>
+            <strong>v{{ version.version }}</strong>
+            <span class="muted">{{ version.provider }} / {{ version.model }}</span>
+            {% if version.target_id and target_lookup.get(version.target_id) %}
+            <p class="small muted">Target: {{ target_lookup[version.target_id].name }}{% if target_lookup[version.target_id].provider_config_id %} · Conn {{ target_lookup[version.target_id].provider_config_id }}{% endif %}</p>
+            {% endif %}
+          </div>
+          <div class="stack-inline">
+            {% if endpoint.active_version_id == version.id %}
+            <span class="badge">Live</span>
+            {% else %}
+            <form method="post" action="/apis/{{ endpoint.id }}/activate" class="inline-form">
+              <input type="hidden" name="version_id" value="{{ version.id }}" />
+              <button type="submit" class="btn btn-secondary">Activate</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="chip-row">
+          <span class="chip">Persona: {{ persona_lookup[version.persona_id].name if version.persona_id and persona_lookup.get(version.persona_id) else "none" }}</span>
+          <span class="chip">Cache TTL: {{ version.params_json.get("cache_ttl_seconds", 0) }}s</span>
+          <span class="chip">Retries: {{ version.params_json.get("max_retries", 1) }}</span>
+          <span class="chip">Few-shot: {% if version.params_json.get("few_shot_enabled") %}on ({{ version.params_json.get("few_shot_limit", 0) }}){% else %}off{% endif %}</span>
+        </div>
+
+        {% set contexts = version_context_map.get(version.id, []) %}
+        {% if contexts %}
+        <p class="small muted">Contexts: {{ contexts | join(', ') }}</p>
+        {% endif %}
+
+        <details>
+          <summary>Inspect prompt + settings</summary>
+          <p class="small muted">Created: {{ version.created_at }}</p>
+          <h4>System prompt</h4>
+          <pre>{{ version.system_prompt }}</pre>
+          <h4>Input template</h4>
+          <pre>{{ version.input_template or "-" }}</pre>
+          <h4>Provider</h4>
+          <pre>{{ version.provider }}</pre>
+          <h4>Target ID</h4>
+          <pre>{{ version.target_id or "-" }}</pre>
+          <h4>Variable schema JSON</h4>
+          <pre>{{ version.variable_schema_json | tojson(indent=2) }}</pre>
+          <h4>Params JSON</h4>
+          <pre>{{ version.params_json | tojson(indent=2) }}</pre>
+        </details>
+      </article>
+      {% endfor %}
+    {% else %}
+      <p class="muted">No versions yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h3>Create New Version</h3>
+    <p class="muted small">Choose a deployment first. Provider/model is derived from deployment to avoid duplicate setup.</p>
+    {% if not can_create_versions %}
+    <div class="flash warn">
+      No ready providers found for this tenant. Configure provider credentials in <a href="/providers">Providers</a> first.
+    </div>
+    {% endif %}
+    <div class="chip-row">
+      <span class="chip">No hidden fallback routing</span>
+      <span class="chip">Tip: enable cache for repeat prompts</span>
+      <span class="chip">Tip: activate only after test run</span>
+    </div>
+
+    <form id="endpoint-version-form" method="post" action="/apis/{{ endpoint.id }}/versions" class="stack">
+      <label class="label">Deployment (recommended)</label>
+      <select name="target_id" id="target-select">
+        <option value="">Manual provider/model (advanced)</option>
+        {% for target in targets %}
+        <option value="{{ target.id }}">
+          {{ target.name }} — {{ target.provider_slug }}/{{ target.model_identifier }}{% if target.provider_config_id %} · {{ target.provider_config_id }}{% endif %}{% if not target.is_verified %} (not verified){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <p class="small muted" id="target-hint">Select deployment to auto-fill provider + model and reduce config overlap.</p>
+      <div class="chip-row" id="deployment-summary" style="display:none;">
+        <span class="chip" id="deployment-summary-name">Deployment: -</span>
+        <span class="chip" id="deployment-summary-provider">Provider: -</span>
+        <span class="chip" id="deployment-summary-model">Model: -</span>
+      </div>
+
+      <details id="manual-route-details" {% if not targets %}open{% endif %}>
+        <summary>Manual provider/model (advanced)</summary>
+        <div class="stack">
+          <label class="label">Provider</label>
+          <select name="provider" id="provider-select">
+            {% if not provider_catalog %}
+            <option value="">No ready providers</option>
+            {% endif %}
+            {% for provider in provider_catalog %}
+            <option value="{{ provider.slug }}">{{ provider.name }} ({{ provider.slug }})</option>
+            {% endfor %}
+          </select>
+          <p class="small muted">
+            Docs:
+            {% for provider in provider_catalog %}
+            <a href="{{ provider.docs_url }}" target="_blank" rel="noreferrer">{{ provider.slug }}</a>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </p>
+
+          <label class="label">Provider connection (optional)</label>
+          <select name="provider_config_id" id="provider-connection-select">
+            <option value="">Use provider default ready connection</option>
+          </select>
+          <p class="small muted">Pick a specific connection when the same provider has multiple keys/deployments.</p>
+
+          <label class="label">Model</label>
+          <select name="model" id="model-select" required></select>
+          <label class="check"><input type="checkbox" id="model-custom-toggle" /> Use custom model/deployment id</label>
+          <input type="text" name="model_custom" id="model-custom-input" placeholder="your-deployment-name" style="display:none;" />
+          <p class="small muted">Use this only if you intentionally want endpoint-specific routing instead of deployment binding.</p>
+        </div>
+      </details>
+
+      <label class="label">Persona</label>
+      <select name="persona_id">
+        <option value="">None</option>
+        {% for persona in personas %}
+        <option value="{{ persona.id }}">{{ persona.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Context blocks (Cmd/Ctrl + click)</label>
+      <select name="context_block_ids" multiple size="4">
+        {% for block in context_blocks %}
+        <option value="{{ block.id }}">{{ block.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">System prompt</label>
+      <textarea name="system_prompt" placeholder="You are a concise, policy-aware support assistant..." required></textarea>
+
+      <label class="label">Input template (optional)</label>
+      <textarea name="input_template" placeholder="Customer {{customer_tier}} says: {{input}}"></textarea>
+
+      <label class="label">Variable schema JSON</label>
+      <textarea name="variable_schema_json">[{"name":"customer_tier","required":false,"default":"standard"}]</textarea>
+
+      <h4>Runtime Controls</h4>
+      <div class="card subtle-card">
+        <h4>Model Parameters (From YAML)</h4>
+        <div id="runtime-model-params-controls" class="stack"></div>
+      </div>
+      <input type="hidden" name="params_json" id="runtime-params-json" value="{}" />
+
+      <label class="label">Timeout (seconds)</label>
+      <input type="number" name="timeout_seconds" min="1" max="600" value="60" />
+
+      <label class="label">Max retries</label>
+      <input type="number" name="max_retries" min="0" max="10" value="1" />
+
+      <label class="check">
+        <input type="checkbox" name="few_shot_enabled" /> Enable few-shot from selected training events
+      </label>
+
+      <label class="label">Few-shot example limit</label>
+      <input type="number" name="few_shot_limit" min="0" max="20" value="3" />
+
+      <label class="check">
+        <input type="checkbox" name="cache_enabled" /> Enable response cache
+      </label>
+
+      <label class="label">Cache TTL (seconds)</label>
+      <input type="number" name="cache_ttl_seconds" min="1" max="604800" value="300" />
+
+      <label class="label">Blocked input phrases (comma-separated)</label>
+      <input type="text" name="blocked_input_phrases" placeholder="credit card, ssn" />
+
+      <label class="label">Blocked output phrases (comma-separated)</label>
+      <input type="text" name="blocked_output_phrases" placeholder="internal-only" />
+
+      <hr />
+      <h4>Run/Test Draft Before Save</h4>
+      <p class="muted small">Run with the current form values (provider/model/system prompt/params) before creating a new version.</p>
+
+      <label class="label">Draft test input</label>
+      <textarea name="draft_test_input" placeholder="Say hello in one line"></textarea>
+
+      <label class="label">Draft test metadata JSON</label>
+      <textarea name="draft_test_metadata_json">{"source":"endpoint-builder"}</textarea>
+
+      <label class="check">
+        <input type="checkbox" name="auto_activate" checked /> Activate immediately
+      </label>
+
+      <div class="stack-inline">
+        <button
+          type="submit"
+          class="btn btn-secondary"
+          formaction="/apis/{{ endpoint.id }}/versions/run-test"
+          formmethod="post"
+          {% if not can_create_versions %}disabled{% endif %}
+        >
+          Run/Test Draft
+        </button>
+        <button type="submit" class="btn" {% if not can_create_versions %}disabled{% endif %}>Create version</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+{% if draft_test_result %}
+<section class="card subtle-card">
+  <div class="card-head">
+    <h3>Draft Run Result</h3>
+    {% if draft_test_result.error %}
+    <span class="badge warn">failed</span>
+    {% else %}
+    <span class="badge">ok</span>
+    {% endif %}
+  </div>
+  <div class="chip-row">
+    <span class="chip">Provider: {{ draft_test_result.provider }}</span>
+    <span class="chip">Model: {{ draft_test_result.model }}</span>
+    <span class="chip">Response ID: {{ draft_test_result.provider_response_id or "-" }}</span>
+  </div>
+
+  <h4>Effective Input</h4>
+  <pre>{{ draft_test_result.effective_input }}</pre>
+
+  {% if draft_test_result.error %}
+  <h4>Error</h4>
+  <pre>{{ draft_test_result.error }}</pre>
+  {% else %}
+  {% if draft_test_result.advisor %}
+  <h4>Token & Cost Advisor</h4>
+  <div class="chip-row">
+    <span class="chip">Input estimate: {{ draft_test_result.advisor.input_tokens_estimate }}</span>
+    <span class="chip">Output target: {{ draft_test_result.advisor.output_tokens_target }}</span>
+    <span class="chip">Expected cost: {% if draft_test_result.advisor.expected_cost_usd is not none %}${{ '%.8f'|format(draft_test_result.advisor.expected_cost_usd) }}{% else %}-{% endif %}</span>
+    <span class="chip">Cacheability: {{ draft_test_result.advisor.cacheability_score }} ({{ draft_test_result.advisor.cacheability_band }})</span>
+    <span class="chip">Estimator: {{ draft_test_result.advisor.estimate_source }}</span>
+  </div>
+  {% if draft_test_result.advisor.tips %}
+  <ul class="list-tight muted small">
+    {% for tip in draft_test_result.advisor.tips %}
+    <li>{{ tip }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endif %}
+  <h4>Result</h4>
+  <pre>{{ draft_test_result.result_text or "-" }}</pre>
+  <h4>Usage</h4>
+  <pre>{{ draft_test_result.usage | tojson(indent=2) if draft_test_result.usage else "-" }}</pre>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h3>Playground Test Run</h3>
+  <p class="muted small">Run test inputs against the active version and open the resulting job instantly.</p>
+
+  <form method="post" action="/apis/{{ endpoint.id }}/test" class="stack">
+    <label class="label">Input</label>
+    <textarea name="input_text" placeholder="Write a customer response for delayed shipment."></textarea>
+
+    <label class="label">Metadata JSON (used as template variables)</label>
+    <textarea name="metadata_json">{"customer_tier":"premium","locale":"en-US"}</textarea>
+
+    <label class="check">
+      <input type="checkbox" name="save_default" /> Save response to training store by default
+    </label>
+
+    <button type="submit" class="btn btn-secondary">Run test</button>
+  </form>
+</section>
+<script>
+  (() => {
+    const copyEndpointButton = document.getElementById("copy-endpoint-id");
+    if (copyEndpointButton) {
+      copyEndpointButton.addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText("{{ endpoint.id }}");
+          copyEndpointButton.textContent = "Copied";
+          setTimeout(() => {
+            copyEndpointButton.textContent = "Copy API ID";
+          }, 1500);
+        } catch (_err) {
+          copyEndpointButton.textContent = "Copy failed";
+          setTimeout(() => {
+            copyEndpointButton.textContent = "Copy API ID";
+          }, 1500);
+        }
+      });
+    }
+
+    const providerModels = {{ provider_models_json | safe }};
+    const providerParams = {{ provider_params_json | safe }};
+    const providerDefaults = {{ provider_defaults_json | safe }};
+    const providerConnections = {{ provider_connections_json | safe }};
+    const targetOptions = {{ target_options_json | safe }};
+    const versionForm = document.getElementById("endpoint-version-form");
+    const providerSelect = document.getElementById("provider-select");
+    const providerConnectionSelect = document.getElementById("provider-connection-select");
+    const modelSelect = document.getElementById("model-select");
+    const modelCustomToggle = document.getElementById("model-custom-toggle");
+    const modelCustomInput = document.getElementById("model-custom-input");
+    const targetSelect = document.getElementById("target-select");
+    const targetHint = document.getElementById("target-hint");
+    const manualRouteDetails = document.getElementById("manual-route-details");
+    const deploymentSummary = document.getElementById("deployment-summary");
+    const deploymentSummaryName = document.getElementById("deployment-summary-name");
+    const deploymentSummaryProvider = document.getElementById("deployment-summary-provider");
+    const deploymentSummaryModel = document.getElementById("deployment-summary-model");
+    const runtimeParamsControls = document.getElementById("runtime-model-params-controls");
+    const runtimeParamsJson = document.getElementById("runtime-params-json");
+    let activeParamSpecs = [];
+
+    function sanitizeId(key) {
+      return String(key || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    function selectedModelValue() {
+      if (modelSelect.value === "__custom__") {
+        return (modelCustomInput.value || "").trim();
+      }
+      return modelSelect.value;
+    }
+
+    function refreshProviderConnections(preferredId = "") {
+      if (!providerConnectionSelect) {
+        return;
+      }
+      const provider = providerSelect.value;
+      const connections = providerConnections[provider] || [];
+      const current = preferredId || providerConnectionSelect.value;
+
+      while (providerConnectionSelect.firstChild) {
+        providerConnectionSelect.removeChild(providerConnectionSelect.firstChild);
+      }
+
+      const defaultOption = document.createElement("option");
+      defaultOption.value = "";
+      defaultOption.textContent = "Use provider default ready connection";
+      providerConnectionSelect.appendChild(defaultOption);
+
+      connections.forEach((connection) => {
+        const option = document.createElement("option");
+        option.value = connection.id;
+        option.textContent = connection.is_default
+          ? `${connection.name} (${connection.id}) • default`
+          : `${connection.name} (${connection.id})`;
+        providerConnectionSelect.appendChild(option);
+      });
+
+      providerConnectionSelect.value = current;
+      if (providerConnectionSelect.value !== current) {
+        providerConnectionSelect.value = "";
+      }
+    }
+
+    function renderRuntimeParams() {
+      const provider = providerSelect.value;
+      const model = selectedModelValue();
+      const allParams = (providerParams[provider] || {})[model] || [];
+      activeParamSpecs = allParams.filter((item) => item.supported);
+
+      if (activeParamSpecs.length === 0) {
+        runtimeParamsControls.innerHTML = '<p class="small muted">No configurable parameters declared for this model.</p>';
+        return;
+      }
+
+      const html = activeParamSpecs.map((spec) => {
+        const inputId = `runtime-param-${sanitizeId(spec.key)}`;
+        const defaultValue = spec.default !== null && spec.default !== undefined ? spec.default : "";
+        if (spec.type === "enum") {
+          const options = (spec.values || []).map((item) => `<option value="${item}" ${String(item) === String(defaultValue) ? "selected" : ""}>${item}</option>`).join("");
+          return `
+            <label class="label">${spec.key}</label>
+            <select id="${inputId}" data-param-key="${spec.key}" data-param-type="enum">${options}</select>
+            <p class="small muted">${spec.description || ""}</p>
+          `;
+        }
+        if (spec.type === "integer" || spec.type === "number") {
+          const step = spec.type === "integer" ? "1" : "0.01";
+          const minAttr = spec.min !== null ? `min="${spec.min}"` : "";
+          const maxAttr = spec.max !== null ? `max="${spec.max}"` : "";
+          return `
+            <label class="label">${spec.key}</label>
+            <input id="${inputId}" type="number" step="${step}" ${minAttr} ${maxAttr} value="${defaultValue}" data-param-key="${spec.key}" data-param-type="${spec.type}" required />
+            <p class="small muted">${spec.description || ""}</p>
+          `;
+        }
+        if (spec.type === "boolean") {
+          const checked = defaultValue ? "checked" : "";
+          return `
+            <label class="check"><input id="${inputId}" type="checkbox" ${checked} data-param-key="${spec.key}" data-param-type="boolean" /> ${spec.key}</label>
+            <p class="small muted">${spec.description || ""}</p>
+          `;
+        }
+        return `
+          <label class="label">${spec.key}</label>
+          <input id="${inputId}" type="text" value="${defaultValue}" data-param-key="${spec.key}" data-param-type="string" />
+          <p class="small muted">${spec.description || ""}</p>
+        `;
+      }).join("");
+
+      runtimeParamsControls.innerHTML = html;
+    }
+
+    function collectRuntimeParams() {
+      const output = {};
+      for (const spec of activeParamSpecs) {
+        const inputId = `runtime-param-${sanitizeId(spec.key)}`;
+        const element = document.getElementById(inputId);
+        if (!element) continue;
+        let value = null;
+        if (spec.type === "boolean") {
+          value = element.checked;
+        } else if (spec.type === "integer") {
+          value = parseInt(element.value, 10);
+          if (!Number.isFinite(value)) throw new Error(`${spec.key} must be an integer.`);
+        } else if (spec.type === "number") {
+          value = parseFloat(element.value);
+          if (!Number.isFinite(value)) throw new Error(`${spec.key} must be a number.`);
+        } else {
+          value = String(element.value || "").trim();
+          if (!value) throw new Error(`${spec.key} is required.`);
+        }
+        if ((spec.type === "integer" || spec.type === "number") && spec.min !== null && value < spec.min) {
+          throw new Error(`${spec.key} must be >= ${spec.min}.`);
+        }
+        if ((spec.type === "integer" || spec.type === "number") && spec.max !== null && value > spec.max) {
+          throw new Error(`${spec.key} must be <= ${spec.max}.`);
+        }
+        if (spec.type === "enum" && Array.isArray(spec.values) && spec.values.length > 0 && !spec.values.includes(value)) {
+          throw new Error(`${spec.key} must be one of: ${spec.values.join(", ")}.`);
+        }
+        if (spec.key === "reasoning_effort") {
+          output.reasoning = { effort: String(value) };
+        } else {
+          output[spec.key] = value;
+        }
+      }
+      return output;
+    }
+
+    function syncModelCustomMode() {
+      const customMode = modelSelect.value === "__custom__";
+      modelCustomToggle.checked = customMode;
+      modelCustomInput.style.display = customMode ? "block" : "none";
+      modelCustomInput.required = customMode;
+    }
+
+    function setModelValue(provider, desiredModel) {
+      const models = providerModels[provider] || [];
+      while (modelSelect.firstChild) {
+        modelSelect.removeChild(modelSelect.firstChild);
+      }
+      models.forEach((model) => {
+        const option = document.createElement("option");
+        option.value = model;
+        option.textContent = model;
+        if (model === desiredModel) {
+          option.selected = true;
+        }
+        modelSelect.appendChild(option);
+      });
+      const customOption = document.createElement("option");
+      customOption.value = "__custom__";
+      customOption.textContent = "Custom model/deployment...";
+      modelSelect.appendChild(customOption);
+
+      if (desiredModel && !models.includes(desiredModel)) {
+        modelSelect.value = "__custom__";
+        modelCustomInput.value = desiredModel;
+      } else if (!modelSelect.value && models.length > 0) {
+        modelSelect.value = models[0];
+      } else if (!modelSelect.value) {
+        modelSelect.value = "__custom__";
+      }
+      syncModelCustomMode();
+      renderRuntimeParams();
+    }
+
+    function refreshModelOptions() {
+      const provider = providerSelect.value;
+      refreshProviderConnections();
+      const defaultModel = providerDefaults[provider] || "gpt-5-nano";
+      const previousProvider = providerSelect.dataset.prevProvider || "";
+      const current = selectedModelValue();
+      const shouldReset = !current || current === providerDefaults[previousProvider] || current === "gpt-5-nano";
+      setModelValue(provider, shouldReset ? defaultModel : current);
+      providerSelect.dataset.prevProvider = provider;
+    }
+
+    providerSelect.addEventListener("change", refreshModelOptions);
+    modelSelect.addEventListener("change", () => {
+      syncModelCustomMode();
+      renderRuntimeParams();
+    });
+    modelCustomToggle.addEventListener("change", () => {
+      if (modelCustomToggle.checked) {
+        modelSelect.value = "__custom__";
+      } else {
+        const provider = providerSelect.value;
+        const models = providerModels[provider] || [];
+        modelSelect.value = models.length > 0 ? models[0] : "__custom__";
+      }
+      syncModelCustomMode();
+      renderRuntimeParams();
+    });
+    modelCustomInput.addEventListener("input", renderRuntimeParams);
+    refreshModelOptions();
+
+    function applyTargetSelection() {
+      const selectedTargetId = targetSelect ? targetSelect.value : "";
+      if (!selectedTargetId) {
+        modelCustomInput.readOnly = false;
+        if (providerConnectionSelect) {
+          providerConnectionSelect.disabled = false;
+          refreshProviderConnections();
+        }
+        if (manualRouteDetails) {
+          manualRouteDetails.open = true;
+        }
+        if (deploymentSummary) {
+          deploymentSummary.style.display = "none";
+        }
+        if (targetHint) {
+          targetHint.textContent = "Manual mode active. Select deployment to auto-fill provider + model.";
+        }
+        return;
+      }
+
+      const selectedTarget = targetOptions[selectedTargetId];
+      if (!selectedTarget) {
+        return;
+      }
+
+      providerSelect.value = selectedTarget.provider;
+      refreshModelOptions();
+      setModelValue(selectedTarget.provider, selectedTarget.model);
+      if (providerConnectionSelect) {
+        refreshProviderConnections(selectedTarget.provider_config_id || "");
+        providerConnectionSelect.disabled = true;
+      }
+      modelCustomInput.readOnly = modelSelect.value === "__custom__";
+      if (manualRouteDetails) {
+        manualRouteDetails.open = false;
+      }
+      if (deploymentSummary) {
+        deploymentSummary.style.display = "flex";
+      }
+      if (deploymentSummaryName) {
+        deploymentSummaryName.textContent = `Deployment: ${selectedTarget.name || selectedTargetId}`;
+      }
+      if (deploymentSummaryProvider) {
+        deploymentSummaryProvider.textContent = `Provider: ${selectedTarget.provider}`;
+      }
+      if (deploymentSummaryModel) {
+        deploymentSummaryModel.textContent = `Model: ${selectedTarget.model}`;
+      }
+      renderRuntimeParams();
+      if (targetHint) {
+        const verification = selectedTarget.is_verified ? "verified" : "not verified";
+        const activity = selectedTarget.is_active ? "active" : "disabled";
+        targetHint.textContent = `Deployment-bound routing · ${selectedTarget.capability_profile} · ${verification} · ${activity}`;
+      }
+    }
+
+    if (targetSelect) {
+      if (!targetSelect.value && targetSelect.options.length > 1) {
+        targetSelect.value = targetSelect.options[1].value;
+      }
+      targetSelect.addEventListener("change", applyTargetSelection);
+      applyTargetSelection();
+    }
+    if (versionForm) {
+      versionForm.addEventListener("submit", (event) => {
+        try {
+          runtimeParamsJson.value = JSON.stringify(collectRuntimeParams());
+        } catch (error) {
+          event.preventDefault();
+          alert(error.message || "Invalid model parameter value.");
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

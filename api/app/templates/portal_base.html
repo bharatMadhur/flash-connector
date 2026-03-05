@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>flash-connector portal</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260305-6" />
+    <link rel="stylesheet" href="/static/style.css?v=20260305-2" />
+  </head>
+  <body>
+    <div class="shell">
+      <main class="main" style="padding:24px 32px;">
+        {% if portal %}
+        <header class="topbar" style="margin-bottom:20px;">
+          <div class="topbar-left">
+            <h1 class="topbar-title">Sub-tenant Review Portal</h1>
+            <p class="muted small">Scope: <code>{{ portal.subtenant_code }}</code></p>
+          </div>
+          <div class="topbar-right">
+            <div class="topbar-meta">
+              <span class="pill">Permissions: {{ portal.permissions | join(", ") }}</span>
+            </div>
+            <a class="btn btn-secondary" href="/portal/review/jobs">Jobs</a>
+            <a class="btn btn-secondary" href="/portal/review/training">Training</a>
+            <form method="post" action="/portal/review/logout" class="inline-form">
+              <button type="submit" class="btn btn-secondary">Exit</button>
+            </form>
+          </div>
+        </header>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </body>
+  </html>

@@ -1,0 +1,29 @@
+model: gpt-realtime-mini
+display_name: GPT Realtime Mini
+family: gpt-realtime
+category: realtime_audio
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Lower-cost realtime model.
+parameters:
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.8
+    description: Controls output variability.
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 4096
+    default: 384
+    description: Maximum text token output per response segment.
+  voice:
+    supported: true
+    type: enum
+    values: [alloy, ash, ballad, coral, sage, verse]
+    default: alloy
+    description: Voice preset for audio output.

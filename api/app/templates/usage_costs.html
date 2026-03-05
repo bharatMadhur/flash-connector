@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="card-head">
+    <h2>Usage & Cost Explorer</h2>
+    <span class="badge info">{{ summary.window_hours }}h window</span>
+  </div>
+  <p class="small muted">
+    Time range: {{ summary.from_at }} to {{ summary.to_at }}.
+    Cost values are estimated from provider usage and pricing rules.
+  </p>
+  <form method="get" action="/usage-costs" class="inline-form">
+    <label class="label">Window</label>
+    <select name="window_hours">
+      {% for option in window_options %}
+      <option value="{{ option.hours }}" {% if option.hours == window_hours %}selected{% endif %}>{{ option.label }}</option>
+      {% endfor %}
+    </select>
+    <label class="label">Top rows</label>
+    <input type="number" min="1" max="100" step="1" name="bucket_limit" value="{{ bucket_limit }}" />
+    <button type="submit" class="btn btn-secondary">Apply</button>
+  </form>
+</section>
+
+<div class="stats-grid stats-grid-compact">
+  <article class="stat-card">
+    <p class="kicker">Jobs</p>
+    <h2>{{ summary.jobs_total }}</h2>
+    <p class="muted small">Completed {{ summary.jobs_completed }}, failed {{ summary.jobs_failed }}, canceled {{ summary.jobs_canceled }}</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Estimated Cost</p>
+    <h2>${{ '%.6f'|format(summary.estimated_cost_usd) }}</h2>
+    <p class="muted small">BYOK ${{ '%.6f'|format(summary.byok_cost_usd) }}</p>
+  </article>
+  <article class="stat-card">
+    <p class="kicker">Token Usage</p>
+    <h2>{{ summary.total_tokens }}</h2>
+    <p class="muted small">Input {{ summary.input_tokens }} | Output {{ summary.output_tokens }}</p>
+  </article>
+</div>
+
+<div class="grid-3">
+  <section class="card">
+    <h3>By Billing Mode</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mode</th>
+            <th>Jobs</th>
+            <th>Cost</th>
+            <th>Tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.by_billing_mode %}
+          <tr>
+            <td><code>{{ row.label }}</code></td>
+            <td>{{ row.jobs_total }}</td>
+            <td>${{ '%.6f'|format(row.estimated_cost_usd) }}</td>
+            <td>{{ row.total_tokens }}</td>
+          </tr>
+          {% endfor %}
+          {% if not summary.by_billing_mode %}
+          <tr>
+            <td colspan="4" class="muted">No jobs in this window.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Top Sub-tenant Codes</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Sub-tenant</th>
+            <th>Jobs</th>
+            <th>Cost</th>
+            <th>Tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.by_subtenant %}
+          <tr>
+            <td><code>{{ row.label }}</code></td>
+            <td>{{ row.jobs_total }}</td>
+            <td>${{ '%.6f'|format(row.estimated_cost_usd) }}</td>
+            <td>{{ row.total_tokens }}</td>
+          </tr>
+          {% endfor %}
+          {% if not summary.by_subtenant %}
+          <tr>
+            <td colspan="4" class="muted">No sub-tenant usage in this window.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>By Provider</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Jobs</th>
+            <th>Cost</th>
+            <th>Tokens</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in summary.by_provider %}
+          <tr>
+            <td><code>{{ row.label }}</code></td>
+            <td>{{ row.jobs_total }}</td>
+            <td>${{ '%.6f'|format(row.estimated_cost_usd) }}</td>
+            <td>{{ row.total_tokens }}</td>
+          </tr>
+          {% endfor %}
+          {% if not summary.by_provider %}
+          <tr>
+            <td colspan="4" class="muted">No provider usage in this window.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

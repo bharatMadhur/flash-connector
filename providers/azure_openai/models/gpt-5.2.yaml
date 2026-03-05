@@ -1,0 +1,34 @@
+model: gpt-5.2
+display_name: GPT-5.2
+family: gpt-5
+category: reasoning
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Azure OpenAI GPT-5.2 equivalent model/deployment profile.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 2048
+    description: Upper bound on generated tokens.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [minimal, low, medium, high]
+    default: medium
+    description: Controls reasoning depth.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Usually unsupported on default GPT-5.2 reasoning mode.
+  top_p:
+    supported: false
+    type: number
+    min: 0
+    max: 1
+    description: Usually unsupported on default GPT-5.2 reasoning mode.

@@ -1,0 +1,68 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flash}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flash}
+      POSTGRES_DB: ${POSTGRES_DB:-flash_connector}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flash} -d ${POSTGRES_DB:-flash_connector}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-flash}:${POSTGRES_PASSWORD:-flash}@postgres:5432/${POSTGRES_DB:-flash_connector}
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - tenant_secrets:/tmp/flash_connector_secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-flash}:${POSTGRES_PASSWORD:-flash}@postgres:5432/${POSTGRES_DB:-flash_connector}
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - tenant_secrets:/tmp/flash_connector_secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  tenant_secrets:

@@ -1,0 +1,34 @@
+model: gpt-5.2-codex
+display_name: GPT-5.2 Codex
+family: gpt-5-codex
+category: coding
+supports_realtime: true
+supports_vision: false
+supports_tools: true
+notes: GPT-5.2 variant optimized for software engineering tasks.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 400000
+    default: 3072
+    description: Maximum generated token count.
+  reasoning_effort:
+    supported: true
+    type: enum
+    values: [minimal, low, medium, high]
+    default: medium
+    description: Depth of reasoning for code synthesis/debugging.
+  temperature:
+    supported: false
+    type: number
+    min: 0
+    max: 2
+    description: Usually disabled on codex-style GPT-5 reasoning models.
+  top_p:
+    supported: false
+    type: number
+    min: 0
+    max: 1
+    description: Usually disabled on codex-style GPT-5 reasoning models.

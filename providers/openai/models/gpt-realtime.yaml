@@ -1,0 +1,35 @@
+model: gpt-realtime
+display_name: GPT Realtime
+family: gpt-realtime
+category: realtime_audio
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Realtime multimodal model for low-latency voice/interactive sessions.
+parameters:
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.8
+    description: Controls response variability in realtime sessions.
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 4096
+    default: 512
+    description: Maximum text token output per response segment.
+  voice:
+    supported: true
+    type: enum
+    values: [alloy, ash, ballad, coral, sage, verse]
+    default: alloy
+    description: Voice preset for audio output.
+  audio_format:
+    supported: true
+    type: enum
+    values: [pcm16, g711_ulaw, g711_alaw]
+    default: pcm16
+    description: Audio codec for streaming.

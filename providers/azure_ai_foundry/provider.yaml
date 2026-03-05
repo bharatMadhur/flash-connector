@@ -1,0 +1,62 @@
+slug: azure_ai_foundry
+name: Azure AI Foundry (Model Inference)
+models_from: azure_openai
+aliases:
+  - azure-foundry
+  - azure_ai_inference
+  - foundry
+logo_path: /static/provider-azure-openai.svg
+platform_key_env: AZURE_AI_FOUNDRY_API_KEY
+requires_api_key: true
+docs:
+  api: https://learn.microsoft.com/en-us/azure/ai-foundry/model-inference/reference/reference-model-inference-api
+  models: https://learn.microsoft.com/en-us/azure/ai-foundry/model-inference/concepts/models
+  pricing: https://azure.microsoft.com/en-us/pricing/details/ai-studio/
+  responses: https://learn.microsoft.com/en-us/azure/ai-foundry/model-inference/how-to/use-chat-completions
+  realtime: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/realtime-audio-websockets
+connection_fields:
+  - key: api_key
+    label: API Key
+    type: password
+    required: true
+    placeholder: "<azure-foundry-key>"
+    description: Key for your Azure AI Foundry inference endpoint.
+  - key: api_base
+    label: Inference Base URL
+    type: url
+    required: true
+    placeholder: https://your-resource.services.ai.azure.com/models
+    description: Foundry model inference base endpoint.
+  - key: api_version
+    label: API Version
+    type: text
+    required: false
+    placeholder: ""
+    description: Optional depending on endpoint mode.
+default_model: gpt-4.1-mini
+recommended_models:
+  - gpt-5.2
+  - gpt-5.2-pro
+  - gpt-5.2-codex
+  - gpt-5.1
+  - gpt-5.1-codex
+  - gpt-5.1-codex-max
+  - gpt-5
+  - gpt-5-pro
+  - gpt-5-codex
+  - gpt-5-mini
+  - gpt-5-nano
+  - gpt-4.1
+  - gpt-4.1-mini
+  - gpt-4.1-nano
+  - gpt-4o
+  - gpt-4o-mini
+  - o4-mini
+  - o3
+  - o3-pro
+  - o3-mini
+  - gpt-realtime
+  - gpt-realtime-mini
+  - gpt-image-1
+  - text-embedding-3-large
+  - text-embedding-3-small

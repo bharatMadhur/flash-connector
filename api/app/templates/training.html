@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="hero-head">
+    <div>
+      <p class="kicker">Step 5</p>
+      <h2>Training Dataset + Few-Shot Library</h2>
+      <p class="muted small">Capture high-signal examples, mark few-shot samples, and export JSONL for downstream fine-tuning pipelines.</p>
+    </div>
+    <div class="chip-row compact">
+      <span class="chip">Endpoint-scoped data</span>
+      <span class="chip">Few-shot selection</span>
+      <span class="chip">JSONL export</span>
+    </div>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>Create Manual Few-Shot Example</h3>
+    <form method="post" action="/training/few-shot/create" class="stack">
+      <label class="label">Endpoint</label>
+      <select name="endpoint_id" required>
+        <option value="">Select endpoint</option>
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}">{{ endpoint.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Input</label>
+      <textarea name="input_text" placeholder="Customer question or prompt..." required></textarea>
+
+      <label class="label">Ideal Output</label>
+      <textarea name="output_text" placeholder="Assistant response..." required></textarea>
+
+      <label class="label">Feedback (optional)</label>
+      <input type="text" name="feedback" placeholder="thumb_up" />
+
+      <label class="label">Sub-tenant code (optional)</label>
+      <input type="text" name="subtenant_code" placeholder="ACME-123" />
+
+      <label class="label">Tags (comma-separated)</label>
+      <input type="text" name="tags" placeholder="support, fewshot" />
+
+      <label class="label">Save mode</label>
+      <select name="save_mode">
+        <option value="full" selected>full</option>
+        <option value="redacted">redacted</option>
+      </select>
+
+      <button type="submit" class="btn">Add Few-Shot Example</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Export JSONL</h3>
+    <form method="post" action="/training/export" class="filter-grid">
+      <div>
+        <label class="label">Endpoint</label>
+        <select name="endpoint_id">
+          <option value="">All</option>
+          {% for endpoint in endpoints %}
+          <option value="{{ endpoint.id }}" {% if endpoint_id == endpoint.id %}selected{% endif %}>{{ endpoint.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="label">Feedback</label>
+        <input type="text" name="feedback" value="{{ feedback or '' }}" placeholder="thumb_up" />
+      </div>
+      <div>
+        <label class="label">Sub-tenant code</label>
+        <input type="text" name="subtenant_code" value="{{ subtenant_code or '' }}" placeholder="ACME-123" />
+      </div>
+      <div>
+        <label class="label">Few-shot</label>
+        <select name="few_shot_filter">
+          <option value="all" {% if few_shot_filter == 'all' %}selected{% endif %}>All</option>
+          <option value="selected" {% if few_shot_filter == 'selected' %}selected{% endif %}>Only selected</option>
+          <option value="unselected" {% if few_shot_filter == 'unselected' %}selected{% endif %}>Only unselected</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Tags (comma-separated)</label>
+        <input type="text" name="tags" placeholder="support,english" />
+      </div>
+      <div class="actions-row">
+        <button type="submit" class="btn">Export JSONL</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<section class="card">
+  <h3>Training Events</h3>
+  <form method="get" action="/training" class="filter-grid">
+    <div>
+      <label class="label">Endpoint</label>
+      <select name="endpoint_id">
+        <option value="">All</option>
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}" {% if endpoint_id == endpoint.id %}selected{% endif %}>{{ endpoint.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="label">Feedback</label>
+      <input type="text" name="feedback" value="{{ feedback or '' }}" />
+    </div>
+    <div>
+      <label class="label">Sub-tenant code</label>
+      <input type="text" name="subtenant_code" value="{{ subtenant_code or '' }}" />
+    </div>
+    <div>
+      <label class="label">Few-shot</label>
+      <select name="few_shot_filter">
+        <option value="all" {% if few_shot_filter == 'all' %}selected{% endif %}>All</option>
+        <option value="selected" {% if few_shot_filter == 'selected' %}selected{% endif %}>Selected</option>
+        <option value="unselected" {% if few_shot_filter == 'unselected' %}selected{% endif %}>Unselected</option>
+      </select>
+    </div>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-secondary">Apply Filters</button>
+    </div>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Event</th>
+          <th>Endpoint</th>
+          <th>Sub-tenant</th>
+          <th>Job</th>
+          <th>Few-shot</th>
+          <th>Feedback</th>
+          <th>Tags</th>
+          <th>Mode</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td><code>{{ event.id }}</code></td>
+          <td>{{ event.endpoint_id }}</td>
+          <td>{{ event.subtenant_code or "-" }}</td>
+          <td><code>{{ event.job_id or "-" }}</code></td>
+          <td>
+            <form method="post" action="/training/{{ event.id }}/few-shot" class="inline-form">
+              <input type="hidden" name="enabled" value="{{ '0' if event.is_few_shot else '1' }}" />
+              <button type="submit" class="btn btn-secondary">
+                {% if event.is_few_shot %}Selected{% else %}Select{% endif %}
+              </button>
+            </form>
+          </td>
+          <td>{{ event.feedback or "-" }}</td>
+          <td>{{ (event.tags or []) | join(', ') }}</td>
+          <td>{{ event.save_mode.value }}</td>
+          <td>{{ event.created_at }}</td>
+        </tr>
+        {% endfor %}
+        {% if not events %}
+        <tr>
+          <td colspan="9" class="muted">No training events yet.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

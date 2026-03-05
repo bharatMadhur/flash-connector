@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <h2>OpenAI Legacy Mode + Variables</h2>
+  <p class="muted small">For multi-provider setup use <a href="/providers">Providers</a>. This section keeps backward-compatible OpenAI tenant/platform mode.</p>
+  <div class="stack-inline">
+    <a class="btn btn-secondary" href="/providers">Open Provider Connections</a>
+    <span class="chip">Template variables available as <code>{{variable_name}}</code></span>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+
+  <div class="chip-row">
+    <span class="chip">Tenant: {{ tenant.name }}</span>
+    <span class="chip">Current mode: {{ tenant.llm_auth_mode.value }}</span>
+    <span class="chip">Platform key configured: {{ "yes" if platform_has_key else "no" }}</span>
+    <span class="chip">Tenant key configured: {{ "yes" if tenant_has_key else "no" }}</span>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>Update LLM Settings</h3>
+    <form method="post" action="/settings/llm" class="stack">
+      <label class="label">LLM auth mode</label>
+      <select name="llm_auth_mode">
+        <option value="platform" {% if tenant.llm_auth_mode.value == 'platform' %}selected{% endif %}>platform</option>
+        <option value="tenant" {% if tenant.llm_auth_mode.value == 'tenant' %}selected{% endif %}>tenant</option>
+      </select>
+
+      <label class="label">Tenant OpenAI API key (optional update)</label>
+      <input type="password" name="openai_api_key" placeholder="sk-..." />
+
+      <label class="check">
+        <input type="checkbox" name="clear_tenant_key" /> Clear tenant-managed key
+      </label>
+
+      <button type="submit" class="btn">Save settings</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Tenant Variables</h3>
+    <p class="muted small">Variables are available in endpoint input templates as {% raw %}<code>{{variable_name}}</code>{% endraw %} and can be overridden by job metadata.</p>
+
+    <form method="post" action="/settings/variables/create" class="stack">
+      <label class="label">Variable key</label>
+      <input type="text" name="key" placeholder="company_name" required />
+
+      <label class="label">Value</label>
+      <textarea name="value" placeholder="Acme Corp"></textarea>
+
+      <label class="check">
+        <input type="checkbox" name="is_secret" /> Mark as secret
+      </label>
+
+      <button type="submit" class="btn btn-secondary">Add variable</button>
+    </form>
+  </section>
+</div>
+
+<section class="card">
+  <h3>Current Variables</h3>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Value</th>
+          <th>Secret</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for variable in variables %}
+        <tr>
+          <td><code>{{ variable.key }}</code></td>
+          <td>{% if variable.is_secret %}<span class="muted">••••••••</span>{% else %}{{ variable.value }}{% endif %}</td>
+          <td>{{ "yes" if variable.is_secret else "no" }}</td>
+          <td>
+            <form method="post" action="/settings/variables/{{ variable.id }}/update" class="inline-form">
+              <input type="text" name="value" value="{{ variable.value }}" placeholder="new value" />
+              <label class="check">
+                <input type="checkbox" name="is_secret" {% if variable.is_secret %}checked{% endif %} /> secret
+              </label>
+              <button type="submit" class="btn btn-secondary">Update</button>
+            </form>
+            <form method="post" action="/settings/variables/{{ variable.id }}/delete" class="inline-form">
+              <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not variables %}
+        <tr>
+          <td colspan="4" class="muted">No tenant variables yet.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

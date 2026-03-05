@@ -1,0 +1,25 @@
+model: gpt-4o-transcribe-diarize
+display_name: GPT-4o Transcribe Diarize
+family: gpt-4o-audio
+category: speech_to_text
+supports_realtime: false
+supports_vision: false
+supports_tools: false
+notes: Azure speech-to-text profile with speaker diarization support.
+parameters:
+  language:
+    supported: true
+    type: string
+    description: Optional language hint.
+  diarization:
+    supported: true
+    type: boolean
+    default: true
+    description: Enable speaker diarization in transcript output.
+  max_speakers:
+    supported: true
+    type: integer
+    min: 1
+    max: 20
+    default: 2
+    description: Maximum number of distinct speakers.

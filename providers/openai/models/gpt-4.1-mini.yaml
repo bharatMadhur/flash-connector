@@ -1,0 +1,32 @@
+model: gpt-4.1-mini
+display_name: GPT-4.1 Mini
+family: gpt-4.1
+category: chat
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Lower-latency GPT-4.1 variant.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 32768
+    default: 768
+    description: Maximum output tokens.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.2
+    description: Controls randomness.
+    increase_effect: More variety.
+    decrease_effect: More deterministic output.
+  top_p:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 1
+    description: Nucleus sampling.

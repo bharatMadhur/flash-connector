@@ -1,0 +1,24 @@
+model: gpt-4o-transcribe
+display_name: GPT-4o Transcribe
+family: gpt-4o-audio
+category: speech_to_text
+supports_realtime: false
+supports_vision: false
+supports_tools: false
+notes: Speech-to-text model for transcription workflows.
+parameters:
+  language:
+    supported: true
+    type: string
+    description: Optional language hint (for example en).
+  prompt:
+    supported: true
+    type: string
+    description: Optional biasing prompt for transcription style.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 0
+    description: Sampling temperature for alternate transcripts.

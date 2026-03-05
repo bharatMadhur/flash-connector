@@ -1,0 +1,176 @@
+#!/usr/bin/env sh
+# flashctl: operator helper for flash-connector standalone and microservice modes.
+
+set -eu
+
+ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+ENV_FILE="$ROOT_DIR/.env"
+ENV_EXAMPLE="$ROOT_DIR/.env.example"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker is required."
+  exit 1
+fi
+
+if ! docker compose version >/dev/null 2>&1; then
+  echo "docker compose plugin is required."
+  exit 1
+fi
+
+random_hex() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex "$1"
+    return
+  fi
+  # Fallback when openssl is unavailable.
+  date +%s | sha256sum | awk '{print $1}'
+}
+
+random_fernet_like_key() {
+  if command -v openssl >/dev/null 2>&1; then
+    # 32 random bytes -> 44-char base64 key, URL-safe transformed.
+    openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n'
+    printf '\n'
+    return
+  fi
+  # Minimal fallback; recommend replacing manually for production.
+  printf 'REPLACE_ME_TENANT_SECRET_ENCRYPTION_KEY\n'
+}
+
+ensure_env_file() {
+  if [ ! -f "$ENV_FILE" ]; then
+    cp "$ENV_EXAMPLE" "$ENV_FILE"
+    echo "Created .env from .env.example"
+  fi
+}
+
+set_env_key() {
+  key="$1"
+  value="$2"
+  tmp_file="$ENV_FILE.tmp"
+
+  awk -v k="$key" -v v="$value" '
+    BEGIN { replaced = 0 }
+    {
+      if (!replaced && $0 ~ ("^" k "=")) {
+        print k "=" v
+        replaced = 1
+        next
+      }
+      print $0
+    }
+    END {
+      if (!replaced) print k "=" v
+    }
+  ' "$ENV_FILE" > "$tmp_file"
+  mv "$tmp_file" "$ENV_FILE"
+}
+
+read_env_value() {
+  key="$1"
+  if [ ! -f "$ENV_FILE" ]; then
+    printf ''
+    return
+  fi
+  grep -E "^${key}=" "$ENV_FILE" | head -n1 | cut -d= -f2-
+}
+
+init_env() {
+  ensure_env_file
+
+  session_secret=$(read_env_value "SESSION_SECRET")
+  api_key_secret=$(read_env_value "API_KEY_HMAC_SECRET")
+  tenant_enc_key=$(read_env_value "TENANT_SECRET_ENCRYPTION_KEY")
+
+  if [ -z "$session_secret" ] || [ "$session_secret" = "change-me-session-secret" ]; then
+    set_env_key "SESSION_SECRET" "$(random_hex 32)"
+    echo "Set SESSION_SECRET"
+  fi
+  if [ -z "$api_key_secret" ] || [ "$api_key_secret" = "change-me-api-key-secret" ]; then
+    set_env_key "API_KEY_HMAC_SECRET" "$(random_hex 32)"
+    echo "Set API_KEY_HMAC_SECRET"
+  fi
+  if [ -z "$tenant_enc_key" ] || [ "$tenant_enc_key" = "REPLACE_ME_TENANT_SECRET_ENCRYPTION_KEY" ]; then
+    set_env_key "TENANT_SECRET_ENCRYPTION_KEY" "$(random_fernet_like_key)"
+    echo "Set TENANT_SECRET_ENCRYPTION_KEY"
+  fi
+
+  # Keep OSS ready for multi-tenant installs.
+  set_env_key "SINGLE_TENANT_MODE" "false"
+  echo "Set SINGLE_TENANT_MODE=false"
+}
+
+init_local_mode() {
+  init_env
+  set_env_key "LOCAL_AUTH_ENABLED" "true"
+  set_env_key "LOCAL_AUTH_USERNAME" "test"
+  set_env_key "LOCAL_AUTH_PASSWORD" "test"
+  set_env_key "LOCAL_AUTH_EMAIL" "test@local.dev"
+  set_env_key "LOCAL_AUTH_ROLE" "owner"
+  if [ -z "$(read_env_value "LOCAL_BOOTSTRAP_API_KEY")" ]; then
+    set_env_key "LOCAL_BOOTSTRAP_API_KEY" "fc_local_test_key_$(random_hex 8)"
+  fi
+  echo "Enabled local login and bootstrap API key in .env"
+}
+
+usage() {
+  cat <<EOF
+flashctl commands:
+  init         Prepare .env and generate required secrets.
+  init-local   Same as init + enable local test login and bootstrap key.
+  up           Start standalone stack (postgres + redis + api + worker).
+  up-bg        Start standalone stack detached.
+  up-micro     Start microservice mode (api + worker only; external DB/Redis).
+  up-micro-bg  Start microservice mode detached.
+  down         Stop standalone stack.
+  down-micro   Stop microservice stack.
+  logs [svc]   Tail logs (all services or one service).
+  health       Check /healthz and /readyz endpoints.
+EOF
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  init)
+    init_env
+    ;;
+  init-local)
+    init_local_mode
+    ;;
+  up)
+    docker compose --project-directory "$ROOT_DIR" up --build
+    ;;
+  up-bg)
+    docker compose --project-directory "$ROOT_DIR" up --build -d
+    ;;
+  up-micro)
+    docker compose --project-directory "$ROOT_DIR" -f "$ROOT_DIR/docker-compose.microservice.yml" up --build
+    ;;
+  up-micro-bg)
+    docker compose --project-directory "$ROOT_DIR" -f "$ROOT_DIR/docker-compose.microservice.yml" up --build -d
+    ;;
+  down)
+    docker compose --project-directory "$ROOT_DIR" down
+    ;;
+  down-micro)
+    docker compose --project-directory "$ROOT_DIR" -f "$ROOT_DIR/docker-compose.microservice.yml" down
+    ;;
+  logs)
+    if [ $# -ge 2 ]; then
+      docker compose --project-directory "$ROOT_DIR" logs -f "$2"
+    else
+      docker compose --project-directory "$ROOT_DIR" logs -f
+    fi
+    ;;
+  health)
+    echo "healthz:"
+    curl -sS "http://localhost:8000/healthz" || true
+    printf '\n\nreadyz:\n'
+    curl -sS "http://localhost:8000/readyz" || true
+    printf '\n'
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac

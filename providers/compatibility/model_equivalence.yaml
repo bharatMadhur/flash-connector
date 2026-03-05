@@ -1,0 +1,205 @@
+groups:
+  - id: flagship_reasoning_latest
+    title: Flagship Reasoning (Latest)
+    description: Current highest-end GPT-5.2 reasoning models.
+    members:
+      - provider: openai
+        model: gpt-5.2
+      - provider: azure_openai
+        model: gpt-5.2
+      - provider: openai
+        model: gpt-5.2-pro
+      - provider: azure_openai
+        model: gpt-5.2-pro
+
+  - id: coding_latest
+    title: Coding Models (Latest)
+    description: GPT-5.2 codex family mappings for software engineering workloads.
+    members:
+      - provider: openai
+        model: gpt-5.2-codex
+      - provider: azure_openai
+        model: gpt-5.2-codex
+
+  - id: reasoning_previous_gen
+    title: Reasoning (Previous Gen)
+    description: GPT-5.1 generation equivalents.
+    members:
+      - provider: openai
+        model: gpt-5.1
+      - provider: azure_openai
+        model: gpt-5.1
+      - provider: openai
+        model: gpt-5.1-codex
+      - provider: azure_openai
+        model: gpt-5.1-codex
+      - provider: openai
+        model: gpt-5.1-codex-max
+      - provider: azure_openai
+        model: gpt-5.1-codex-max
+
+  - id: premium_reasoning
+    title: Premium Reasoning
+    description: Highest reasoning depth models for complex tasks.
+    members:
+      - provider: openai
+        model: gpt-5
+      - provider: azure_openai
+        model: gpt-5
+      - provider: openai
+        model: gpt-5-pro
+      - provider: azure_openai
+        model: gpt-5-pro
+      - provider: openai
+        model: gpt-5-codex
+      - provider: azure_openai
+        model: gpt-5-codex
+
+  - id: balanced_reasoning
+    title: Balanced Reasoning
+    description: Best quality/latency balance for general reasoning workloads.
+    members:
+      - provider: openai
+        model: gpt-5-mini
+      - provider: azure_openai
+        model: gpt-5-mini
+
+  - id: budget_reasoning
+    title: Budget Reasoning
+    description: Cost-efficient reasoning for production high-volume traffic.
+    members:
+      - provider: openai
+        model: gpt-5-nano
+      - provider: azure_openai
+        model: gpt-5-nano
+
+  - id: premium_chat
+    title: Premium Chat
+    description: High-quality chat/assistant behavior with broader sampling control.
+    members:
+      - provider: openai
+        model: gpt-4.1
+      - provider: azure_openai
+        model: gpt-4.1
+
+  - id: balanced_chat
+    title: Balanced Chat
+    description: Lower-cost and lower-latency chat alternative.
+    members:
+      - provider: openai
+        model: gpt-4.1-mini
+      - provider: azure_openai
+        model: gpt-4.1-mini
+
+  - id: budget_chat
+    title: Budget Chat
+    description: Ultra low-cost text generation.
+    members:
+      - provider: openai
+        model: gpt-4.1-nano
+      - provider: azure_openai
+        model: gpt-4.1-nano
+
+  - id: omni_multimodal
+    title: Omni Multimodal
+    description: General multimodal model family mapping.
+    members:
+      - provider: openai
+        model: gpt-4o
+      - provider: azure_openai
+        model: gpt-4o
+      - provider: openai
+        model: gpt-4o-mini
+      - provider: azure_openai
+        model: gpt-4o-mini
+
+  - id: o_series_reasoning
+    title: O-Series Reasoning
+    description: Reasoning-first o-series equivalents.
+    members:
+      - provider: openai
+        model: o3
+      - provider: azure_openai
+        model: o3
+      - provider: openai
+        model: o3-mini
+      - provider: azure_openai
+        model: o3-mini
+      - provider: openai
+        model: o3-pro
+      - provider: azure_openai
+        model: o3-pro
+      - provider: openai
+        model: o4-mini
+      - provider: azure_openai
+        model: o4-mini
+
+  - id: realtime_audio
+    title: Realtime Audio
+    description: Low-latency realtime model equivalents.
+    members:
+      - provider: openai
+        model: gpt-realtime
+      - provider: azure_openai
+        model: gpt-realtime
+      - provider: openai
+        model: gpt-realtime-mini
+      - provider: azure_openai
+        model: gpt-realtime-mini
+
+  - id: image_generation
+    title: Image Generation
+    description: Image generation/edit model mapping.
+    members:
+      - provider: openai
+        model: gpt-image-1
+      - provider: azure_openai
+        model: gpt-image-1
+
+  - id: embeddings
+    title: Embeddings
+    description: Embedding model mapping.
+    members:
+      - provider: openai
+        model: text-embedding-3-large
+      - provider: azure_openai
+        model: text-embedding-3-large
+      - provider: openai
+        model: text-embedding-3-small
+      - provider: azure_openai
+        model: text-embedding-3-small
+      - provider: openai
+        model: text-embedding-ada-002
+      - provider: azure_openai
+        model: text-embedding-ada-002
+
+  - id: transcription
+    title: Speech To Text
+    description: Audio transcription model mapping.
+    members:
+      - provider: openai
+        model: gpt-4o-transcribe
+      - provider: azure_openai
+        model: gpt-4o-transcribe
+      - provider: openai
+        model: gpt-4o-mini-transcribe
+      - provider: azure_openai
+        model: gpt-4o-mini-transcribe
+
+  - id: tts
+    title: Text To Speech
+    description: Text-to-speech model mapping.
+    members:
+      - provider: openai
+        model: gpt-4o-mini-tts
+      - provider: azure_openai
+        model: gpt-4o-mini-tts
+
+  - id: computer_use
+    title: Computer Use
+    description: Agentic computer-use model mapping.
+    members:
+      - provider: openai
+        model: computer-use-preview
+      - provider: azure_openai
+        model: computer-use-preview

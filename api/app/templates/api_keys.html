@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="hero-head">
+    <div>
+      <p class="kicker">Step 3</p>
+      <h2>Virtual API Keys</h2>
+      <p class="muted small">Create scoped keys for client apps. Raw key values are visible only once at creation time.</p>
+    </div>
+    <div class="chip-row compact">
+      <span class="chip">Send header: <code>x-api-key</code></span>
+      <span class="chip">API-scoped access</span>
+      <span class="chip">Rate + quota controls</span>
+    </div>
+  </div>
+  {% if new_api_key %}
+  <div class="flash">
+    <strong>Copy now (shown once):</strong>
+    <code>{{ new_api_key.value }}</code>
+  </div>
+  {% endif %}
+  {% if flash_message %}
+  <div class="flash warn">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h3>Issued Keys</h3>
+      <span class="badge info">{{ keys|length }}</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Prefix</th>
+            <th>Scopes</th>
+            <th>Rate</th>
+            <th>Quota</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for key in keys %}
+          <tr>
+            <td>{{ key.name }}</td>
+            <td><code>{{ key.key_prefix }}</code></td>
+            <td><pre>{{ key.scopes | tojson(indent=2) }}</pre></td>
+            <td>{{ key.rate_limit_per_min }}/min</td>
+            <td>{{ key.monthly_quota }}/month</td>
+            <td>{% if key.is_active %}<span class="badge">active</span>{% else %}<span class="badge warn">inactive</span>{% endif %}</td>
+            <td>
+              {% if key.is_active %}
+              <form method="post" action="/api-keys/{{ key.id }}/deactivate" class="inline-form">
+                <button type="submit" class="btn btn-danger">Deactivate</button>
+              </form>
+              {% else %}
+              <span class="muted">-</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not keys %}
+          <tr>
+            <td colspan="7" class="muted">No API keys yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>Create Key</h3>
+    <form method="post" action="/api-keys/create" class="stack">
+      <label class="label">Name</label>
+      <input type="text" name="name" required />
+
+      <label class="label">Scope mode</label>
+      <select name="scope_mode" id="scope-mode-select">
+        <option value="all">All APIs</option>
+        <option value="selected">Selected APIs only</option>
+      </select>
+
+      <label class="label" id="endpoint-scope-label">Allowed APIs (Cmd/Ctrl + click)</label>
+      <select name="endpoint_ids" id="endpoint-scope-select" multiple size="6">
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}">{{ endpoint.name }} ({{ endpoint.id }})</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Rate limit per minute</label>
+      <input type="number" name="rate_limit_per_min" value="60" min="1" />
+
+      <label class="label">Monthly quota</label>
+      <input type="number" name="monthly_quota" value="10000" min="1" />
+
+      <button type="submit" class="btn">Create Key</button>
+    </form>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const scopeMode = document.getElementById("scope-mode-select");
+    const endpointScope = document.getElementById("endpoint-scope-select");
+    const endpointLabel = document.getElementById("endpoint-scope-label");
+
+    function refreshScopeUI() {
+      const isSelectedMode = scopeMode.value === "selected";
+      endpointScope.disabled = !isSelectedMode;
+      endpointScope.style.opacity = isSelectedMode ? "1" : "0.55";
+      endpointLabel.style.opacity = isSelectedMode ? "1" : "0.55";
+      if (!isSelectedMode) {
+        Array.from(endpointScope.options).forEach((option) => {
+          option.selected = false;
+        });
+      }
+    }
+
+    scopeMode.addEventListener("change", refreshScopeUI);
+    refreshScopeUI();
+  })();
+</script>
+{% endblock %}

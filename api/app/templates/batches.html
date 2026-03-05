@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="hero-head">
+    <div>
+      <p class="kicker">Batch Operations</p>
+      <h2>Provider-Native Async Batches</h2>
+      <p class="muted small">Submit one bulk job to a configured provider connection, then monitor batch state and per-job outcomes inside flash-connector.</p>
+    </div>
+    <span class="badge info">{{ batches|length }} recent run(s)</span>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>Create Provider Batch</h3>
+    <form method="post" action="/batches/create" class="stack">
+      <label class="label">Endpoint</label>
+      <select name="endpoint_id" required>
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}">{{ endpoint.name }} ({{ endpoint.id }})</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Batch name (optional)</label>
+      <input type="text" name="batch_name" placeholder="support-qa-2026-02-27" />
+
+      <label class="label">Service tier</label>
+      <select name="service_tier">
+        <option value="auto" selected>auto</option>
+        <option value="default">default</option>
+        <option value="flex">flex</option>
+        <option value="priority">priority</option>
+      </select>
+
+      <label class="label">Inputs (one per line)</label>
+      <textarea name="inputs_text" placeholder="Line 1 prompt&#10;Line 2 prompt&#10;Line 3 prompt" required></textarea>
+
+      <label class="label">Shared metadata JSON</label>
+      <textarea name="metadata_json">{}</textarea>
+
+      <label class="label">Sub-tenant code (optional)</label>
+      <input type="text" name="subtenant_code" placeholder="team_alpha" />
+
+      <label class="check"><input type="checkbox" name="save_default" /> Save all outputs to training by default</label>
+      <button type="submit" class="btn">Submit Provider Batch</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Recent Batch Runs</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Batch Run</th>
+            <th>Provider / Model</th>
+            <th>Status</th>
+            <th>Progress</th>
+            <th>Provider Batch</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for batch in batches %}
+          <tr>
+            <td>
+              <a href="/batches?batch_id={{ batch.id }}"><strong>{{ batch.request_json.get('batch_name') or batch.id }}</strong></a>
+              <p class="small muted"><code>{{ batch.id }}</code></p>
+            </td>
+            <td><code>{{ batch.provider_slug }}/{{ batch.model_used }}</code></td>
+            <td><code>{{ batch.status }}</code></td>
+            <td>{{ batch.completed_jobs + batch.failed_jobs + batch.canceled_jobs }}/{{ batch.total_jobs }}</td>
+            <td>
+              {% if batch.provider_batch_id %}
+              <code>{{ batch.provider_batch_id }}</code>
+              {% else %}
+              <span class="muted">pending</span>
+              {% endif %}
+            </td>
+            <td>{{ batch.created_at }}</td>
+            <td>
+              {% if batch.status not in ["completed", "failed", "canceled"] %}
+              <form method="post" action="/batches/{{ batch.id }}/cancel" class="inline-form">
+                <button type="submit" class="btn btn-danger">Cancel</button>
+              </form>
+              {% else %}
+              <span class="muted">-</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not batches %}
+          <tr>
+            <td colspan="7" class="muted">No provider batch runs yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Batch Jobs{% if selected_batch_id %}: <code>{{ selected_batch_id }}</code>{% endif %}</h3>
+    {% if selected_run %}
+    <span class="badge info">{{ selected_run.status }}</span>
+    {% endif %}
+  </div>
+  {% if selected_run %}
+  <p class="small muted">Provider: <code>{{ selected_run.provider_slug }}/{{ selected_run.model_used }}</code> | Provider batch: <code>{{ selected_run.provider_batch_id or "pending" }}</code></p>
+  {% endif %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Job ID</th>
+          <th>Status</th>
+          <th>Batch Status</th>
+          <th>Provider / Model</th>
+          <th>Cost (USD)</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in selected_jobs %}
+        <tr>
+          <td><a href="/runs/{{ job.id }}"><code>{{ job.id }}</code></a></td>
+          <td><code>{{ job.status.value if job.status else "-" }}</code></td>
+          <td><code>{{ job.provider_batch_status or "-" }}</code></td>
+          <td><code>{{ job.provider_used or "-" }}/{{ job.model_used or "-" }}</code></td>
+          <td>{{ '%.6f'|format(job.estimated_cost_usd or 0.0) }}</td>
+          <td>{{ job.created_at }}</td>
+        </tr>
+        {% endfor %}
+        {% if selected_batch_id and not selected_jobs %}
+        <tr>
+          <td colspan="6" class="muted">No jobs found for this batch run.</td>
+        </tr>
+        {% endif %}
+        {% if not selected_batch_id %}
+        <tr>
+          <td colspan="6" class="muted">Select a batch run to inspect jobs.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

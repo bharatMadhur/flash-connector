@@ -1,0 +1,30 @@
+model: gpt-5.2-chat
+display_name: GPT-5.2 Chat
+family: gpt-5-chat
+category: chat
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: Chat-optimized GPT-5.2 profile where exposed in Azure model catalog.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 200000
+    default: 2048
+    description: Output length ceiling.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.2
+    description: Sampling temperature when enabled for this deployment.
+  top_p:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 1
+    description: Nucleus sampling cutoff.

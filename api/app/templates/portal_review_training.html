@@ -1,0 +1,50 @@
+{% extends "portal_base.html" %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Training Events</h2>
+    <span class="badge info">{{ events|length }} shown</span>
+  </div>
+  <p class="small muted">Scoped to subtenant code <code>{{ portal.subtenant_code }}</code>.</p>
+
+  {% if can_export %}
+  <form method="post" action="/portal/review/training/export" class="filters">
+    <input type="text" name="feedback" placeholder="feedback filter" />
+    <input type="text" name="tags" placeholder="tags: support,gold" />
+    <button type="submit" class="btn btn-secondary">Export JSONL</button>
+  </form>
+  {% endif %}
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Created</th>
+          <th>Job</th>
+          <th>Feedback</th>
+          <th>Tags</th>
+          <th>Save mode</th>
+          <th>Output</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td>{{ event.created_at }}</td>
+          <td><code>{{ event.job_id or "-" }}</code></td>
+          <td><code>{{ event.feedback or "-" }}</code></td>
+          <td><code>{{ (event.tags or []) | join(", ") or "-" }}</code></td>
+          <td><code>{{ event.save_mode.value }}</code></td>
+          <td><pre>{{ (event.edited_ideal_output or event.output_text or "-")[:300] }}</pre></td>
+        </tr>
+        {% endfor %}
+        {% if not events %}
+        <tr>
+          <td colspan="6" class="muted">No training events yet for this subtenant scope.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "portal_base.html" %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h2>Review Job <code>{{ job.id }}</code></h2>
+    <a href="/portal/review/jobs">Back to list</a>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+  <p class="small muted">
+    Endpoint: <code>{{ endpoint.name if endpoint else job.endpoint_id }}</code> ·
+    Version: <code>{{ version.version if version else job.endpoint_version_id }}</code> ·
+    Status: <code>{{ job.status.value }}</code>
+  </p>
+
+  <h3>Input</h3>
+  <pre>{{ job.request_json | tojson(indent=2) }}</pre>
+
+  <h3>Output</h3>
+  <pre>{{ job.result_text or "-" }}</pre>
+
+  <h3>Usage</h3>
+  <pre>{{ job.usage_json | tojson(indent=2) if job.usage_json else "-" }}</pre>
+</section>
+
+<section class="card">
+  <h3>Save Training Feedback</h3>
+  {% if can_add_feedback %}
+  <form method="post" action="/portal/review/jobs/{{ job.id }}/save" class="stack">
+    <label class="label">Feedback</label>
+    <input type="text" name="feedback" placeholder="thumb_up / thumb_down / rating-1" />
+
+    {% if can_edit_ideal %}
+    <label class="label">Edited ideal output</label>
+    <textarea name="edited_ideal_output" placeholder="What the output should ideally be"></textarea>
+    {% endif %}
+
+    <label class="label">Tags (comma-separated)</label>
+    <input type="text" name="tags" placeholder="support,quality" />
+
+    <label class="label">Save mode</label>
+    <select name="save_mode">
+      <option value="full" selected>full</option>
+      <option value="redacted">redacted</option>
+    </select>
+
+    <button type="submit" class="btn">Save</button>
+  </form>
+  {% else %}
+  <p class="muted">This portal link does not allow feedback submission.</p>
+  {% endif %}
+</section>
+{% endblock %}

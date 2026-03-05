@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="card-head">
+    <h2>Tenant Hierarchy</h2>
+    <span class="badge info">{{ tenants|length }} accessible</span>
+  </div>
+  <p class="muted small">
+    Parent tenants can create sub-tenants. Each sub-tenant can inherit or override default query params and provider configs.
+  </p>
+  <div class="chip-row">
+    <span class="chip">Query params mode: inherit / merge / override</span>
+    <span class="chip">Provider inheritance: on/off per tenant</span>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h3>Create Sub-Tenant</h3>
+    <form method="post" action="/tenants/create" class="stack">
+      <label class="label">Name</label>
+      <input type="text" name="name" required />
+
+      <label class="label">Parent tenant</label>
+      <select name="parent_tenant_id">
+        {% for tenant in tenants %}
+        <option value="{{ tenant.id }}" {% if active_tenant_id == tenant.id %}selected{% endif %}>{{ tenant.name }}</option>
+        {% endfor %}
+      </select>
+
+      <label class="check">
+        <input type="checkbox" name="can_create_subtenants" /> Allow this tenant to create its own sub-tenants
+      </label>
+
+      <label class="check">
+        <input type="checkbox" name="inherit_provider_configs" checked /> Inherit provider configs from parent when not overridden
+      </label>
+
+      <label class="label">Query params mode</label>
+      <select name="query_params_mode">
+        <option value="inherit">inherit (same as parent)</option>
+        <option value="merge">merge (parent + this tenant)</option>
+        <option value="override">override (this tenant only)</option>
+      </select>
+
+      <label class="label">Default query params JSON</label>
+      <textarea name="query_params_json">{"locale":"en-US"}</textarea>
+
+      <button type="submit" class="btn">Create sub-tenant</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Update Tenant Runtime Rules</h3>
+    <form method="post" action="/tenants/{{ active_tenant_id }}/update" class="stack">
+      <label class="check">
+        <input type="checkbox" name="can_create_subtenants" {% if active_tenant and active_tenant.can_create_subtenants %}checked{% endif %} /> Allow sub-tenant creation
+      </label>
+      <label class="check">
+        <input type="checkbox" name="inherit_provider_configs" {% if active_tenant and active_tenant.inherit_provider_configs %}checked{% endif %} /> Inherit provider configs when not overridden
+      </label>
+      <label class="label">Query params mode</label>
+      <select name="query_params_mode">
+        <option value="inherit" {% if active_tenant and active_tenant.query_params_mode.value == 'inherit' %}selected{% endif %}>inherit</option>
+        <option value="merge" {% if active_tenant and active_tenant.query_params_mode.value == 'merge' %}selected{% endif %}>merge</option>
+        <option value="override" {% if active_tenant and active_tenant.query_params_mode.value == 'override' %}selected{% endif %}>override</option>
+      </select>
+      <label class="label">Default query params JSON</label>
+      <textarea name="query_params_json">{{ active_tenant.query_params_json | tojson if active_tenant else '{}' }}</textarea>
+      <button type="submit" class="btn btn-secondary">Update current tenant rules</button>
+    </form>
+  </section>
+</div>
+
+{% if active_tenant %}
+<section class="card">
+  <h3>Active Tenant Effective Query Params</h3>
+  <p class="muted small">
+    These are the defaults currently injected for <code>{{ active_tenant.name }}</code> after inheritance rules are applied.
+  </p>
+  <pre>{{ active_effective_query_params | tojson(indent=2) }}</pre>
+</section>
+{% endif %}
+
+<section class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Parent</th>
+          <th>Can Create Children</th>
+          <th>Inherit Providers</th>
+          <th>Query Mode</th>
+          <th>Local Query Params</th>
+          <th>Effective Query Params</th>
+          <th>Context</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tenant in tenants %}
+        <tr>
+          <td>{{ tenant.name }}</td>
+          <td><code>{{ tenant.parent_tenant_id or "-" }}</code></td>
+          <td>{{ "yes" if tenant.can_create_subtenants else "no" }}</td>
+          <td>{{ "yes" if tenant.inherit_provider_configs else "no" }}</td>
+          <td>{{ tenant.query_params_mode.value }}</td>
+          <td><pre>{{ tenant.query_params_json | tojson(indent=2) }}</pre></td>
+          <td><pre>{{ effective_query_params_by_tenant.get(tenant.id, {}) | tojson(indent=2) }}</pre></td>
+          <td>
+            {% if active_tenant_id == tenant.id %}
+            <span class="badge">active</span>
+            {% else %}
+            <form method="post" action="/tenant-context/switch" class="inline-form">
+              <input type="hidden" name="tenant_id" value="{{ tenant.id }}" />
+              <button type="submit" class="btn btn-secondary">Switch</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

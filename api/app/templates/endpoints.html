@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block content %}
+{% set live_api_count = endpoints | selectattr("active_version_id") | list | length %}
+<section class="page-hero">
+  <div class="page-hero-grid">
+    <div class="hero-intro">
+      <p class="kicker">Step 2</p>
+      <h2>API Registry</h2>
+      <p class="muted small">Create API shells, then publish immutable versions with provider + prompt settings on the API detail page.</p>
+      <div class="hero-actions">
+        <a class="btn btn-secondary" href="/deployments">View Model Deployments</a>
+        <a class="btn" href="#create-endpoint">Create API</a>
+      </div>
+    </div>
+    <div class="hero-kpi-grid">
+      <article class="hero-kpi">
+        <p class="kicker">Total APIs</p>
+        <strong>{{ endpoints|length }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Live APIs</p>
+        <strong>{{ live_api_count }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Draft APIs</p>
+        <strong>{{ endpoints|length - live_api_count }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Versioning</p>
+        <strong>Immutable</strong>
+      </article>
+    </div>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <div class="card-head">
+      <h3>APIs</h3>
+      <span class="badge info">{{ endpoints|length }} total</span>
+    </div>
+    <p class="muted small">Use API ID in public calls: <code>POST /v1/endpoints/{endpoint_id}/jobs</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>API ID</th>
+            <th>Live Configuration</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for endpoint in endpoints %}
+          <tr>
+            <td><a href="/apis/{{ endpoint.id }}"><strong>{{ endpoint.name }}</strong></a></td>
+            <td><a href="/apis/{{ endpoint.id }}"><code>{{ endpoint.id }}</code></a></td>
+            <td><code>{{ endpoint.active_version_id or "-" }}</code></td>
+            <td>{{ endpoint.created_at }}</td>
+            <td>
+              <button type="button" class="btn btn-secondary copy-endpoint-id" data-endpoint-id="{{ endpoint.id }}">Copy ID</button>
+              <a class="btn btn-secondary" href="/apis/{{ endpoint.id }}">Open</a>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if not endpoints %}
+          <tr>
+            <td colspan="5" class="muted">No endpoints yet.</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" id="create-endpoint">
+    <h3>Create API</h3>
+    <p class="muted small">Start with a clear API name and purpose. Versioning happens next.</p>
+    <form method="post" action="/apis/create" class="stack">
+      <label class="label">Name</label>
+      <input type="text" name="name" placeholder="support-assistant" required />
+
+      <label class="label">Description</label>
+      <textarea name="description" placeholder="What this endpoint does and expected output behavior"></textarea>
+
+      <button type="submit" class="btn">Create API</button>
+    </form>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const buttons = document.querySelectorAll(".copy-endpoint-id");
+    buttons.forEach((button) => {
+      button.addEventListener("click", async () => {
+        const endpointId = button.getAttribute("data-endpoint-id");
+        if (!endpointId) {
+          return;
+        }
+        const previous = button.textContent;
+        try {
+          await navigator.clipboard.writeText(endpointId);
+          button.textContent = "Copied";
+        } catch (_err) {
+          button.textContent = "Copy failed";
+        }
+        setTimeout(() => {
+          button.textContent = previous;
+        }, 1200);
+      });
+    });
+  })();
+</script>
+{% endblock %}

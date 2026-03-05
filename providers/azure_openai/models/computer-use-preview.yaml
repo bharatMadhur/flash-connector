@@ -1,0 +1,28 @@
+model: computer-use-preview
+display_name: computer-use-preview
+family: computer-use
+category: agentic_actions
+supports_realtime: false
+supports_vision: true
+supports_tools: true
+notes: Azure preview profile for computer-use style action planning.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 32768
+    default: 1024
+    description: Maximum action-plan output size.
+  tool_choice:
+    supported: true
+    type: enum
+    values: [auto, required]
+    default: auto
+    description: Tool calling strategy.
+  safety_mode:
+    supported: true
+    type: enum
+    values: [strict, balanced]
+    default: strict
+    description: Safety policy strictness for action generation.

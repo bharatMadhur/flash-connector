@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero-card">
+  <div class="hero-head">
+    <div>
+      <p class="kicker">Step 4</p>
+      <h2>Run Explorer</h2>
+      <p class="muted small">Track async execution by <code>job_id</code>. Responses are safely correlated even when completion order differs.</p>
+    </div>
+    <div class="chip-row compact">
+      <span class="chip">Async polling</span>
+      <span class="chip">Cache visibility</span>
+      <span class="chip">Per-job cost tracking</span>
+    </div>
+  </div>
+
+  <form method="get" action="/runs" class="filter-grid">
+    <div>
+      <label class="label">API</label>
+      <select name="endpoint_id">
+        <option value="">All</option>
+        {% for endpoint in endpoints %}
+        <option value="{{ endpoint.id }}" {% if endpoint_id == endpoint.id %}selected{% endif %}>{{ endpoint.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="label">Status</label>
+      <select name="status_filter">
+        <option value="">Any</option>
+        {% for status in ['queued', 'running', 'completed', 'failed', 'canceled'] %}
+        <option value="{{ status }}" {% if status_filter == status %}selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="label">Provider</label>
+      <select name="provider_filter">
+        <option value="">Any</option>
+        {% for provider in providers %}
+        <option value="{{ provider }}" {% if provider_filter == provider %}selected{% endif %}>{{ provider }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="label">Sub-tenant code</label>
+      <input type="text" name="subtenant_code" value="{{ subtenant_code or '' }}" placeholder="ACME-123" />
+    </div>
+    <div>
+      <label class="label">Cache</label>
+      <select name="cache_filter">
+        <option value="">Any</option>
+        <option value="hit" {% if cache_filter == 'hit' %}selected{% endif %}>Hit only</option>
+        <option value="miss" {% if cache_filter == 'miss' %}selected{% endif %}>Miss only</option>
+      </select>
+    </div>
+    <div class="actions-row">
+      <button type="submit" class="btn btn-secondary">Apply Filters</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Run ID</th>
+          <th>API</th>
+          <th>Sub-tenant</th>
+          <th>Status</th>
+          <th>Provider</th>
+          <th>Model</th>
+          <th>Cost</th>
+          <th>Cache</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td><code>{{ job.id }}</code></td>
+          <td>{{ job.endpoint_id }}</td>
+          <td>{{ job.subtenant_code or "-" }}</td>
+          <td><span class="badge {% if job.status.value in ['failed', 'canceled'] %}warn{% endif %}">{{ job.status.value }}</span></td>
+          <td>{{ job.provider_used or "-" }}</td>
+          <td>{{ job.model_used or "-" }}</td>
+          <td>{% if job.estimated_cost_usd is not none %}${{ '%.8f'|format(job.estimated_cost_usd) }}{% else %}<span class="muted">-</span>{% endif %}</td>
+          <td>{% if job.cache_hit %}<span class="badge info">hit</span>{% else %}<span class="muted">miss</span>{% endif %}</td>
+          <td>{{ job.created_at }}</td>
+          <td><a class="btn btn-secondary" href="/runs/{{ job.id }}">Details</a></td>
+        </tr>
+        {% endfor %}
+        {% if not jobs %}
+        <tr>
+          <td colspan="10" class="muted">No jobs found.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

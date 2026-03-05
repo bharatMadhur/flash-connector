@@ -1,0 +1,50 @@
+model: gpt-4.1
+display_name: GPT-4.1
+family: gpt-4.1
+category: chat
+supports_realtime: true
+supports_vision: true
+supports_tools: true
+notes: General-purpose high-quality model.
+parameters:
+  max_output_tokens:
+    supported: true
+    type: integer
+    min: 1
+    max: 32768
+    default: 1024
+    description: Maximum output tokens.
+    increase_effect: Allows more detailed outputs.
+    decrease_effect: Shorter responses.
+  temperature:
+    supported: true
+    type: number
+    min: 0
+    max: 2
+    default: 0.2
+    description: Controls randomness.
+    increase_effect: More creative/diverse outputs.
+    decrease_effect: More deterministic responses.
+  top_p:
+    supported: true
+    type: number
+    min: 0
+    max: 1
+    default: 1
+    description: Nucleus sampling cutoff.
+    increase_effect: Broader token sampling.
+    decrease_effect: Narrower token sampling.
+  frequency_penalty:
+    supported: true
+    type: number
+    min: -2
+    max: 2
+    default: 0
+    description: Penalizes repeated tokens.
+  presence_penalty:
+    supported: true
+    type: number
+    min: -2
+    max: 2
+    default: 0
+    description: Encourages new topic exploration.

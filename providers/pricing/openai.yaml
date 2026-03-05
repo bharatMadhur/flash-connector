@@ -1,0 +1,36 @@
+provider: openai
+source: builtin_estimate
+as_of: "2026-03-05"
+rates:
+  - model_pattern: gpt-5-nano*
+    input_per_1m_usd: 0.05
+    output_per_1m_usd: 0.4
+    cached_input_per_1m_usd: 0.005
+  - model_pattern: gpt-5-mini*
+    input_per_1m_usd: 0.25
+    output_per_1m_usd: 2.0
+    cached_input_per_1m_usd: 0.025
+  - model_pattern: gpt-5*
+    input_per_1m_usd: 1.25
+    output_per_1m_usd: 10.0
+    cached_input_per_1m_usd: 0.125
+  - model_pattern: gpt-4.1-nano*
+    input_per_1m_usd: 0.1
+    output_per_1m_usd: 0.4
+    cached_input_per_1m_usd: 0.025
+  - model_pattern: gpt-4.1-mini*
+    input_per_1m_usd: 0.4
+    output_per_1m_usd: 1.6
+    cached_input_per_1m_usd: 0.1
+  - model_pattern: gpt-4.1*
+    input_per_1m_usd: 2.0
+    output_per_1m_usd: 8.0
+    cached_input_per_1m_usd: 0.5
+  - model_pattern: gpt-4o-mini*
+    input_per_1m_usd: 0.15
+    output_per_1m_usd: 0.6
+    cached_input_per_1m_usd: 0.0375
+  - model_pattern: gpt-4o*
+    input_per_1m_usd: 2.5
+    output_per_1m_usd: 10.0
+    cached_input_per_1m_usd: 0.625

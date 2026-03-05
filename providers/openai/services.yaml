@@ -1,0 +1,190 @@
+schema_version: 1
+provider: openai
+last_reviewed_utc: "2026-02-27"
+source_docs:
+  - title: OpenAI API Reference Overview
+    url: https://developers.openai.com/api/reference/overview
+  - title: OpenAI Models Catalog
+    url: https://platform.openai.com/docs/models
+  - title: OpenAI Realtime Guide
+    url: https://developers.openai.com/api/docs/guides/realtime
+  - title: OpenAI Tools Guide
+    url: https://developers.openai.com/api/docs/guides/tools
+  - title: OpenAI Pricing
+    url: https://platform.openai.com/docs/pricing
+transport:
+  protocol: https
+  base_url: https://api.openai.com
+  default_base_path: /v1
+auth:
+  scheme: bearer
+  header: Authorization
+  format: Bearer <api_key>
+flash_runtime:
+  supported_services:
+    - responses
+    - chat_completions
+    - batches
+  notes:
+    - flash-connector executes Responses as primary runtime path.
+    - Chat Completions is retained as SDK-compatibility fallback.
+    - Other services listed below are catalog references and not yet routed by flash runtime.
+services:
+  - id: responses
+    name: Responses API
+    status: ga
+    default_for_flash_runtime: true
+    docs_url: https://platform.openai.com/docs/api-reference/responses/create
+    operations:
+      - method: POST
+        path: /v1/responses
+        operation: create_response
+      - method: GET
+        path: /v1/responses/{response_id}
+        operation: retrieve_response
+      - method: DELETE
+        path: /v1/responses/{response_id}
+        operation: delete_response
+      - method: POST
+        path: /v1/responses/{response_id}/cancel
+        operation: cancel_response
+    notes:
+      - Preferred endpoint for text/multimodal generation and tool calling.
+      - Supports many GPT and o-series models.
+  - id: realtime
+    name: Realtime API
+    status: ga
+    docs_url: https://developers.openai.com/api/docs/guides/realtime
+    transports:
+      - websocket
+      - webrtc
+    operations:
+      - method: POST
+        path: /v1/realtime/sessions
+        operation: create_ephemeral_session
+      - method: WEBSOCKET
+        path: /v1/realtime
+        operation: bidirectional_realtime_session
+    notes:
+      - Used for low-latency voice and streaming sessions.
+      - Model support differs from text-only Responses API models.
+  - id: chat_completions
+    name: Chat Completions API
+    status: ga_legacy
+    docs_url: https://platform.openai.com/docs/api-reference/chat/create
+    operations:
+      - method: POST
+        path: /v1/chat/completions
+        operation: create_chat_completion
+    notes:
+      - Legacy surface kept for compatibility.
+      - Flash runtime uses this only if Responses API is unavailable in client SDK.
+  - id: embeddings
+    name: Embeddings API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/embeddings/create
+    operations:
+      - method: POST
+        path: /v1/embeddings
+        operation: create_embedding
+  - id: images
+    name: Images API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/images
+    operations:
+      - method: POST
+        path: /v1/images/generations
+        operation: create_image
+      - method: POST
+        path: /v1/images/edits
+        operation: edit_image
+      - method: POST
+        path: /v1/images/variations
+        operation: create_image_variation
+  - id: audio
+    name: Audio API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/audio
+    operations:
+      - method: POST
+        path: /v1/audio/transcriptions
+        operation: transcribe_audio
+      - method: POST
+        path: /v1/audio/translations
+        operation: translate_audio
+      - method: POST
+        path: /v1/audio/speech
+        operation: text_to_speech
+  - id: moderations
+    name: Moderations API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/moderations/create
+    operations:
+      - method: POST
+        path: /v1/moderations
+        operation: classify_content
+  - id: files
+    name: Files API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/files
+    operations:
+      - method: POST
+        path: /v1/files
+        operation: upload_file
+      - method: GET
+        path: /v1/files
+        operation: list_files
+      - method: GET
+        path: /v1/files/{file_id}
+        operation: retrieve_file
+      - method: DELETE
+        path: /v1/files/{file_id}
+        operation: delete_file
+  - id: fine_tuning
+    name: Fine-tuning API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/fine-tuning
+    operations:
+      - method: POST
+        path: /v1/fine_tuning/jobs
+        operation: create_fine_tuning_job
+      - method: GET
+        path: /v1/fine_tuning/jobs
+        operation: list_fine_tuning_jobs
+      - method: GET
+        path: /v1/fine_tuning/jobs/{fine_tuning_job_id}
+        operation: retrieve_fine_tuning_job
+      - method: POST
+        path: /v1/fine_tuning/jobs/{fine_tuning_job_id}/cancel
+        operation: cancel_fine_tuning_job
+  - id: vector_stores
+    name: Vector Stores API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/vector-stores
+    operations:
+      - method: POST
+        path: /v1/vector_stores
+        operation: create_vector_store
+      - method: GET
+        path: /v1/vector_stores
+        operation: list_vector_stores
+      - method: POST
+        path: /v1/vector_stores/{vector_store_id}/search
+        operation: search_vector_store
+  - id: batches
+    name: Batch API
+    status: ga
+    docs_url: https://platform.openai.com/docs/api-reference/batch
+    operations:
+      - method: POST
+        path: /v1/batches
+        operation: create_batch
+      - method: GET
+        path: /v1/batches
+        operation: list_batches
+      - method: GET
+        path: /v1/batches/{batch_id}
+        operation: retrieve_batch
+      - method: POST
+        path: /v1/batches/{batch_id}/cancel
+        operation: cancel_batch

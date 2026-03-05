@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+{% block content %}
+{% set ready_total = provider_cards | map(attribute='connections_ready') | sum %}
+{% set connection_total = provider_cards | map(attribute='connections_total') | sum %}
+<section class="page-hero">
+  <div class="page-hero-grid">
+    <div class="hero-intro">
+      <p class="kicker">Step 1</p>
+      <h2>Provider Connections</h2>
+      <p class="muted small">Connect provider credentials first. Once ready, you can immediately create API versions from the APIs page. Model deployments are optional advanced tooling.</p>
+      <div class="hero-actions">
+        <button type="button" class="btn" id="open-provider-create">New Connection</button>
+        <a class="btn btn-secondary" href="/apis">Next: APIs</a>
+      </div>
+    </div>
+    <div class="hero-kpi-grid">
+      <article class="hero-kpi">
+        <p class="kicker">Providers</p>
+        <strong>{{ provider_cards|length }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Connections</p>
+        <strong>{{ connection_total }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Ready</p>
+        <strong>{{ ready_total }}</strong>
+      </article>
+      <article class="hero-kpi">
+        <p class="kicker">Default</p>
+        <strong>{{ configured | selectattr("is_default") | list | length }}</strong>
+      </article>
+    </div>
+  </div>
+  {% if flash_message %}
+  <div class="flash">{{ flash_message }}</div>
+  {% endif %}
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Available Providers</h3>
+    <span class="badge info">{{ provider_cards|length }} in catalog</span>
+  </div>
+  <p class="muted small">Click a tile to open the connection form pre-selected for that provider.</p>
+  <div class="provider-marketplace">
+    {% for card in provider_cards %}
+    {% set provider = card.provider %}
+    <a
+      href="#"
+      class="provider-tile provider-launch {% if selected_provider_slug == provider.slug %}active{% endif %}"
+      data-provider-slug="{{ provider.slug }}"
+      data-provider-name="{{ provider.name }}"
+    >
+      {% if provider.logo_path %}
+      <img src="{{ provider.logo_path }}" alt="{{ provider.name }}" class="provider-logo" />
+      {% endif %}
+      <div class="provider-tile-body">
+        <strong>{{ provider.name }}</strong>
+        <p class="muted small"><code>{{ provider.slug }}</code></p>
+        <div class="chip-row compact">
+          <span class="chip">Connections: {{ card.connections_total }}</span>
+          <span class="chip">Ready: {{ card.connections_ready }}</span>
+          <span class="chip">Platform key: {{ "yes" if card.platform_key_available else "no" }}</span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head">
+    <h3>Configured Connections</h3>
+    <span class="badge info">{{ configured|length }}</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Provider</th>
+          <th>Default</th>
+          <th>Status</th>
+          <th>Auth</th>
+          <th>Key</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for config in configured %}
+        <tr>
+          <td>
+            <strong>{{ config.name }}</strong>
+            {% if config.description %}
+            <p class="small muted">{{ config.description }}</p>
+            {% endif %}
+          </td>
+          <td><code>{{ config.provider_slug }}</code></td>
+          <td>{% if config.is_default %}<span class="badge">default</span>{% else %}<span class="muted">-</span>{% endif %}</td>
+          <td>{% if config.is_active %}<span class="badge">active</span>{% else %}<span class="badge warn">disabled</span>{% endif %}</td>
+          <td><code>{{ config.auth_mode.value }}</code></td>
+          <td>{{ "yes" if config.key_ref else "no" }}</td>
+          <td>
+            <a class="btn btn-secondary" href="/providers?provider_slug={{ config.provider_slug }}&connection_id={{ config.id }}&open_form=1">Edit</a>
+            {% if session_user.role in ['owner', 'admin'] %}
+            <form method="post" action="/providers/{{ config.provider_slug }}/{{ config.id }}/delete" class="inline-form">
+              <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not configured %}
+        <tr>
+          <td colspan="7" class="muted">No provider connections configured yet.</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Documentation</h3>
+  <p class="muted small">Current runtime support: Responses API (chat/text) + provider-native Batch. Realtime, embeddings, images, audio, and fine-tuning remain reference-only until runtime adapters are added.</p>
+  <div class="chip-row">
+    {% for provider in catalog %}
+    <span class="chip"><a href="{{ provider.docs_url }}" target="_blank" rel="noreferrer">{{ provider.name }} API docs</a></span>
+    {% if provider.realtime_docs_url %}
+    <span class="chip"><a href="{{ provider.realtime_docs_url }}" target="_blank" rel="noreferrer">{{ provider.name }} realtime docs</a></span>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+<div class="modal-backdrop" id="provider-modal" aria-hidden="true" hidden>
+  <section class="modal-card">
+    <div class="modal-head">
+      <h3 id="provider-modal-title">{% if selected %}Edit Connection{% else %}Create Connection{% endif %}</h3>
+      <button type="button" class="btn btn-secondary" id="provider-modal-close">Close</button>
+    </div>
+    <p class="muted small" id="provider-modal-subtitle">Configure authentication and runtime connection options.</p>
+
+    <form method="post" action="/providers/save" class="stack" id="provider-form">
+      <input type="hidden" name="provider_config_id" id="provider-config-id" value="{{ selected.id if selected else '' }}" />
+
+      <label class="label">Provider</label>
+      <select name="provider_slug" id="provider-slug" required>
+        {% for provider in catalog %}
+        <option value="{{ provider.slug }}" {% if (selected and selected.provider_slug == provider.slug) or (not selected and selected_provider_slug == provider.slug) %}selected{% endif %}>{{ provider.name }} ({{ provider.slug }})</option>
+        {% endfor %}
+      </select>
+
+      <label class="label">Connection Name</label>
+      <input type="text" name="connection_name" id="connection-name" value="{{ selected.name if selected else '' }}" placeholder="OpenAI Production" required />
+
+      <label class="label">Description (optional)</label>
+      <input type="text" name="description" id="connection-description" value="{{ selected.description if selected else '' }}" placeholder="Primary key for production traffic" />
+
+      <label class="check"><input type="checkbox" name="is_default" id="connection-is-default" {% if selected and selected.is_default %}checked{% endif %} /> Default connection for this provider</label>
+
+      <label class="label">Runtime auth mode</label>
+      <select name="auth_mode" id="connection-auth-mode">
+        <option value="tenant" {% if not selected or selected.auth_mode.value == 'tenant' %}selected{% endif %}>Tenant key</option>
+        <option value="platform" {% if selected and selected.auth_mode.value == 'platform' %}selected{% endif %}>Platform key</option>
+        <option value="none" {% if selected and selected.auth_mode.value == 'none' %}selected{% endif %}>No key</option>
+      </select>
+
+      <div id="connection-fields-dynamic" class="stack">
+        <div class="stack" id="connection-required-block">
+          <p class="small muted">Required provider fields</p>
+          <div id="connection-fields-required" class="stack"></div>
+        </div>
+        <details id="connection-fields-optional-wrap">
+          <summary>Optional provider fields</summary>
+          <div id="connection-fields-optional" class="stack"></div>
+        </details>
+      </div>
+      <label class="check" id="clear-api-key-row"><input type="checkbox" name="clear_api_key" id="connection-clear-api-key" /> Clear stored tenant key</label>
+
+      <details>
+        <summary>Advanced Connection Options</summary>
+        <div class="stack">
+          <label class="label">Extra JSON</label>
+          <textarea name="extra_json" id="connection-extra-json">{{ selected.extra_json | tojson if selected else '{}' }}</textarea>
+        </div>
+      </details>
+
+      <label class="check"><input type="checkbox" name="is_active" id="connection-is-active" {% if not selected or selected.is_active %}checked{% endif %} /> Connection enabled</label>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="provider-modal-cancel">Cancel</button>
+        <button type="submit" class="btn" id="provider-modal-submit">{% if selected %}Update Connection{% else %}Create Connection{% endif %}</button>
+      </div>
+    </form>
+  </section>
+</div>
+
+<script>
+  (() => {
+    const modal = document.getElementById("provider-modal");
+    const launchButtons = document.querySelectorAll(".provider-launch");
+    const openCreateBtn = document.getElementById("open-provider-create");
+    const closeBtn = document.getElementById("provider-modal-close");
+    const cancelBtn = document.getElementById("provider-modal-cancel");
+    const title = document.getElementById("provider-modal-title");
+    const submitBtn = document.getElementById("provider-modal-submit");
+
+    const providerConfigId = document.getElementById("provider-config-id");
+    const providerSlug = document.getElementById("provider-slug");
+    const connectionName = document.getElementById("connection-name");
+    const connectionDescription = document.getElementById("connection-description");
+    const isDefault = document.getElementById("connection-is-default");
+    const authMode = document.getElementById("connection-auth-mode");
+    const dynamicFieldsContainer = document.getElementById("connection-fields-dynamic");
+    const requiredFieldsBlock = document.getElementById("connection-required-block");
+    const requiredFieldsContainer = document.getElementById("connection-fields-required");
+    const optionalFieldsContainer = document.getElementById("connection-fields-optional");
+    const optionalFieldsWrap = document.getElementById("connection-fields-optional-wrap");
+    const clearApiKeyRow = document.getElementById("clear-api-key-row");
+    const clearApiKey = document.getElementById("connection-clear-api-key");
+    const extraJson = document.getElementById("connection-extra-json");
+    const isActive = document.getElementById("connection-is-active");
+    const providerFieldMap = {{ provider_connection_fields_json | safe }};
+    const selectedFieldValues = {{ selected_connection_field_values_json | safe }};
+    let currentFieldValues = { ...selectedFieldValues };
+
+    if (
+      !modal ||
+      !providerSlug ||
+      !connectionName ||
+      !connectionDescription ||
+      !isDefault ||
+      !authMode ||
+      !dynamicFieldsContainer ||
+      !requiredFieldsBlock ||
+      !requiredFieldsContainer ||
+      !optionalFieldsContainer ||
+      !optionalFieldsWrap ||
+      !clearApiKeyRow ||
+      !clearApiKey ||
+      !extraJson ||
+      !isActive
+    ) {
+      return;
+    }
+
+    function inputNameForField(key) {
+      if (key === "api_key" || key === "api_base" || key === "api_version") {
+        return key;
+      }
+      return `conn_field__${key}`;
+    }
+
+    function collectCurrentFieldValues() {
+      const values = {};
+      dynamicFieldsContainer.querySelectorAll("[data-conn-field-key]").forEach((element) => {
+        const key = element.getAttribute("data-conn-field-key");
+        if (!key || key === "api_key") {
+          return;
+        }
+        values[key] = element.value || "";
+      });
+      currentFieldValues = values;
+    }
+
+    function normalizeAzureBase(rawValue) {
+      const raw = (rawValue || "").trim();
+      if (!raw) return "";
+      try {
+        const parsed = new URL(raw);
+        let path = (parsed.pathname || "").replace(/\/+$/, "");
+        const lower = path.toLowerCase();
+
+        if (lower.includes("/openai/v1")) {
+          const idx = lower.indexOf("/openai/v1");
+          path = path.slice(idx, idx + "/openai/v1".length);
+        } else if (lower.includes("/openai/deployments")) {
+          const idx = lower.indexOf("/openai/deployments");
+          path = path.slice(0, idx);
+        } else if (lower.includes("/chat/completions") || lower.includes("/responses") || lower.includes("/embeddings")) {
+          const idx = lower.indexOf("/openai");
+          if (idx >= 0) {
+            path = path.slice(0, idx);
+          }
+        } else if (lower === "/openai" || lower === "/" || lower === "") {
+          path = "";
+        }
+
+        path = path.replace(/\/+$/, "");
+        return `${parsed.protocol}//${parsed.host}${path}`;
+      } catch (_err) {
+        return raw;
+      }
+    }
+
+    function extractAzureApiVersion(rawValue) {
+      try {
+        const parsed = new URL((rawValue || "").trim());
+        return parsed.searchParams.get("api-version") || parsed.searchParams.get("api_version") || "";
+      } catch (_err) {
+        return "";
+      }
+    }
+
+    function wireAzureBaseHint(input, wrapper) {
+      const hint = document.createElement("p");
+      hint.className = "small muted";
+      wrapper.appendChild(hint);
+
+      const renderHint = () => {
+        const raw = (input.value || "").trim();
+        if (!raw) {
+          hint.textContent = "You can paste the Azure resource base or full chat endpoint URL. We'll normalize it.";
+          return;
+        }
+        const normalized = normalizeAzureBase(raw);
+        const detectedVersion = extractAzureApiVersion(raw);
+        const apiVersionInput = dynamicFieldsContainer.querySelector('[data-conn-field-key="api_version"]');
+        const parts = [];
+
+        if (normalized && normalized !== raw) {
+          parts.push(`Will save API base as: ${normalized}`);
+        } else {
+          parts.push("API base format looks valid");
+        }
+        if (detectedVersion && apiVersionInput && !(apiVersionInput.value || "").trim()) {
+          parts.push(`Detected api-version: ${detectedVersion}`);
+        }
+        if (normalized.endsWith("/openai/v1")) {
+          parts.push("Using /openai/v1 mode (API version not required)");
+        }
+        hint.textContent = parts.join(" | ");
+      };
+
+      input.addEventListener("input", renderHint);
+      renderHint();
+    }
+
+    function createFieldInput(field) {
+      const fieldType = String(field.type || "text").toLowerCase();
+      const key = String(field.key || "").trim();
+      const placeholder = field.placeholder || "";
+      const value = key === "api_key" ? "" : (currentFieldValues[key] || "");
+      const required = Boolean(field.required);
+      const labelText = `${field.label || key}${required ? " *" : ""}`;
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "stack";
+
+      const label = document.createElement("label");
+      label.className = "label";
+      label.textContent = labelText;
+      wrapper.appendChild(label);
+
+      let input;
+      if (fieldType === "textarea") {
+        input = document.createElement("textarea");
+        input.value = value;
+      } else {
+        input = document.createElement("input");
+        input.type = fieldType === "url" ? "url" : fieldType === "password" ? "password" : "text";
+        if (input.type !== "password") {
+          input.value = value;
+        }
+      }
+      input.name = inputNameForField(key);
+      input.placeholder = placeholder;
+      input.required = required;
+      input.setAttribute("data-conn-field-key", key);
+      wrapper.appendChild(input);
+
+      if (field.description) {
+        const description = document.createElement("p");
+        description.className = "small muted";
+        description.textContent = field.description;
+        wrapper.appendChild(description);
+      }
+
+      if (String(providerSlug.value || "").startsWith("azure_") && key === "api_base") {
+        wireAzureBaseHint(input, wrapper);
+      }
+
+      return wrapper;
+    }
+
+    function renderProviderFields(providerValue, { resetValues = false } = {}) {
+      if (!resetValues) {
+        collectCurrentFieldValues();
+      } else {
+        currentFieldValues = {};
+      }
+
+      const fields = Array.isArray(providerFieldMap[providerValue]) ? providerFieldMap[providerValue] : [];
+      requiredFieldsContainer.innerHTML = "";
+      optionalFieldsContainer.innerHTML = "";
+      let hasApiKeyField = false;
+      let hasRequiredFields = false;
+      let hasOptionalFields = false;
+      const optionalKeys = [];
+
+      fields.forEach((field) => {
+        if (!field || !field.key) return;
+        if (field.key === "api_key") hasApiKeyField = true;
+        if (field.required) {
+          hasRequiredFields = true;
+          requiredFieldsContainer.appendChild(createFieldInput(field));
+          return;
+        }
+        hasOptionalFields = true;
+        optionalKeys.push(field.key);
+        optionalFieldsContainer.appendChild(createFieldInput(field));
+      });
+
+      requiredFieldsBlock.style.display = hasRequiredFields ? "" : "none";
+      optionalFieldsWrap.style.display = hasOptionalFields ? "" : "none";
+      optionalFieldsWrap.open = hasOptionalFields && optionalKeys.some((key) => {
+        const value = currentFieldValues[key];
+        return typeof value === "string" && value.trim().length > 0;
+      });
+
+      clearApiKeyRow.style.display = hasApiKeyField ? "" : "none";
+      if (!hasApiKeyField) {
+        clearApiKey.checked = false;
+      }
+    }
+
+    function openModal() {
+      modal.hidden = false;
+      modal.classList.add("open");
+      modal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeModal() {
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      modal.hidden = true;
+    }
+
+    function resetForCreate(providerValue, providerName) {
+      title.textContent = `Create ${providerName} Connection`;
+      submitBtn.textContent = "Create Connection";
+      providerConfigId.value = "";
+      providerSlug.value = providerValue;
+      connectionName.value = `${providerName} primary`;
+      connectionDescription.value = "";
+      isDefault.checked = false;
+      authMode.value = "tenant";
+      clearApiKey.checked = false;
+      extraJson.value = "{}";
+      isActive.checked = true;
+      renderProviderFields(providerValue, { resetValues: true });
+    }
+
+    function pickDefaultProvider() {
+      const active = document.querySelector(".provider-launch.active");
+      if (active) {
+        return { slug: active.dataset.providerSlug, name: active.dataset.providerName };
+      }
+      if (launchButtons.length > 0) {
+        return { slug: launchButtons[0].dataset.providerSlug, name: launchButtons[0].dataset.providerName };
+      }
+      const fallback = providerSlug.options[providerSlug.selectedIndex];
+      return { slug: fallback ? fallback.value : "openai", name: fallback ? fallback.textContent : "Provider" };
+    }
+
+    launchButtons.forEach((button) => {
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        resetForCreate(button.dataset.providerSlug, button.dataset.providerName);
+        openModal();
+      });
+    });
+
+    providerSlug.addEventListener("change", () => {
+      renderProviderFields(providerSlug.value);
+    });
+
+    if (openCreateBtn) {
+      openCreateBtn.addEventListener("click", () => {
+        const provider = pickDefaultProvider();
+        resetForCreate(provider.slug, provider.name);
+        openModal();
+      });
+    }
+
+    closeBtn.addEventListener("click", closeModal);
+    cancelBtn.addEventListener("click", closeModal);
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && modal.classList.contains("open")) {
+        closeModal();
+      }
+    });
+
+    const shouldOpenOnLoad = {{ "true" if open_provider_modal else "false" }};
+    renderProviderFields(providerSlug.value);
+    if (shouldOpenOnLoad) {
+      openModal();
+    } else {
+      closeModal();
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,61 @@
+slug: azure_openai_v1
+name: Azure OpenAI (OpenAI v1)
+models_from: azure_openai
+aliases:
+  - azure-openai-v1
+  - azure_v1
+logo_path: /static/provider-azure-openai.svg
+platform_key_env: AZURE_OPENAI_API_KEY
+requires_api_key: true
+docs:
+  api: https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-models/how-to/use-chat-completions
+  models: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/models
+  pricing: https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/
+  responses: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/responses
+  realtime: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/realtime-audio-websockets
+connection_fields:
+  - key: api_key
+    label: API Key
+    type: password
+    required: true
+    placeholder: "<azure-api-key>"
+    description: API key for the Azure OpenAI endpoint.
+  - key: api_base
+    label: OpenAI v1 Base URL
+    type: url
+    required: true
+    placeholder: https://your-resource.openai.azure.com/openai/v1
+    description: OpenAI-compatible Azure base. Shared inference hosts are also supported.
+  - key: api_version
+    label: API Version
+    type: text
+    required: false
+    placeholder: ""
+    description: Ignored in /openai/v1 mode.
+default_model: gpt-4.1-mini
+recommended_models:
+  - gpt-5.2
+  - gpt-5.2-pro
+  - gpt-5.2-codex
+  - gpt-5.1
+  - gpt-5.1-codex
+  - gpt-5.1-codex-max
+  - gpt-5
+  - gpt-5-pro
+  - gpt-5-codex
+  - gpt-5-mini
+  - gpt-5-nano
+  - gpt-4.1
+  - gpt-4.1-mini
+  - gpt-4.1-nano
+  - gpt-4o
+  - gpt-4o-mini
+  - o4-mini
+  - o3
+  - o3-pro
+  - o3-mini
+  - gpt-realtime
+  - gpt-realtime-mini
+  - gpt-image-1
+  - text-embedding-3-large
+  - text-embedding-3-small

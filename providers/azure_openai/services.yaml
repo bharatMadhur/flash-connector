@@ -1,0 +1,173 @@
+schema_version: 1
+provider: azure_openai
+last_reviewed_utc: "2026-02-27"
+source_docs:
+  - title: Azure OpenAI API Reference
+    url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/reference
+  - title: Azure OpenAI Models Catalog
+    url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/models
+  - title: Azure OpenAI Responses API
+    url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/responses
+  - title: Azure OpenAI Realtime API
+    url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/realtime-audio-websockets
+transport:
+  protocol: https
+  base_url_pattern: https://{resource}.openai.azure.com
+  preferred_base_path: /openai/v1
+auth:
+  schemes:
+    - api_key_header
+    - azure_ad_token
+  api_key_header: api-key
+  aad_header: Authorization
+  aad_format: Bearer <entra_id_token>
+flash_runtime:
+  supported_services:
+    - responses
+    - chat_completions
+    - batches
+  notes:
+    - flash-connector executes Responses as primary runtime path.
+    - Chat Completions is retained as SDK-compatibility fallback.
+    - Other services listed below are catalog references and not yet routed by flash runtime.
+endpoint_modes:
+  - id: openai_compatible_v1
+    description: Preferred mode; OpenAI-compatible endpoint shape.
+    base_path: /openai/v1
+  - id: deployment_scoped_legacy
+    description: Legacy deployment-based mode requiring api-version.
+    base_path: /openai/deployments/{deployment-id}
+services:
+  - id: responses
+    name: Responses API
+    status: ga
+    default_for_flash_runtime: true
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/responses
+    operations:
+      - method: POST
+        path: /openai/v1/responses
+        operation: create_response
+      - method: GET
+        path: /openai/v1/responses/{response_id}
+        operation: retrieve_response
+      - method: DELETE
+        path: /openai/v1/responses/{response_id}
+        operation: delete_response
+      - method: POST
+        path: /openai/v1/responses/{response_id}/cancel
+        operation: cancel_response
+    notes:
+      - Recommended path for new integrations.
+      - Same API shape as OpenAI with Azure auth and model availability differences.
+  - id: realtime
+    name: Realtime API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/realtime-audio-websockets
+    transports:
+      - websocket
+      - webrtc
+    operations:
+      - method: WEBSOCKET
+        path: /openai/v1/realtime
+        operation: bidirectional_realtime_session
+      - method: POST
+        path: /openai/v1/realtime/sessions
+        operation: create_ephemeral_session
+  - id: chat_completions
+    name: Chat Completions API
+    status: ga_legacy
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/chatgpt
+    operations:
+      - method: POST
+        path: /openai/v1/chat/completions
+        operation: create_chat_completion
+      - method: POST
+        path: /openai/deployments/{deployment-id}/chat/completions?api-version={api-version}
+        operation: create_chat_completion_legacy
+  - id: embeddings
+    name: Embeddings API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-services/openai/tutorials/embeddings
+    operations:
+      - method: POST
+        path: /openai/v1/embeddings
+        operation: create_embedding
+      - method: POST
+        path: /openai/deployments/{deployment-id}/embeddings?api-version={api-version}
+        operation: create_embedding_legacy
+  - id: images
+    name: Images API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/dall-e
+    operations:
+      - method: POST
+        path: /openai/v1/images/generations
+        operation: create_image
+      - method: POST
+        path: /openai/deployments/{deployment-id}/images/generations?api-version={api-version}
+        operation: create_image_legacy
+  - id: audio
+    name: Audio API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/audio-completions
+    operations:
+      - method: POST
+        path: /openai/v1/audio/transcriptions
+        operation: transcribe_audio
+      - method: POST
+        path: /openai/v1/audio/translations
+        operation: translate_audio
+      - method: POST
+        path: /openai/v1/audio/speech
+        operation: text_to_speech
+  - id: files
+    name: Files API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/rest/api/azureopenai/files
+    operations:
+      - method: POST
+        path: /openai/v1/files
+        operation: upload_file
+      - method: GET
+        path: /openai/v1/files
+        operation: list_files
+      - method: GET
+        path: /openai/v1/files/{file_id}
+        operation: retrieve_file
+      - method: DELETE
+        path: /openai/v1/files/{file_id}
+        operation: delete_file
+  - id: fine_tuning
+    name: Fine-tuning API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/fine-tuning
+    operations:
+      - method: POST
+        path: /openai/v1/fine_tuning/jobs
+        operation: create_fine_tuning_job
+      - method: GET
+        path: /openai/v1/fine_tuning/jobs
+        operation: list_fine_tuning_jobs
+      - method: GET
+        path: /openai/v1/fine_tuning/jobs/{fine_tuning_job_id}
+        operation: retrieve_fine_tuning_job
+      - method: POST
+        path: /openai/v1/fine_tuning/jobs/{fine_tuning_job_id}/cancel
+        operation: cancel_fine_tuning_job
+  - id: batches
+    name: Batch API
+    status: ga
+    docs_url: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/batch
+    operations:
+      - method: POST
+        path: /openai/v1/batches
+        operation: create_batch
+      - method: GET
+        path: /openai/v1/batches
+        operation: list_batches
+      - method: GET
+        path: /openai/v1/batches/{batch_id}
+        operation: retrieve_batch
+      - method: POST
+        path: /openai/v1/batches/{batch_id}/cancel
+        operation: cancel_batch

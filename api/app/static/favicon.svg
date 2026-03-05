@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Flash Connector logo option 04 nexus black">
+  <g fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="64" cy="64" r="15" stroke-width="6.5"/>
+    <circle cx="34" cy="34" r="10" stroke-width="5.5"/>
+    <circle cx="94" cy="34" r="10" stroke-width="5.5"/>
+    <circle cx="34" cy="94" r="10" stroke-width="5.5"/>
+    <circle cx="94" cy="94" r="10" stroke-width="5.5"/>
+    <path d="M53 53 42.5 42.5M75 53 85.5 42.5M53 75 42.5 85.5M75 75 85.5 85.5" stroke-width="6"/>
+    <path d="M64 34v15M64 79v15M34 64h15M79 64h15" stroke-width="4.5" opacity=".65"/>
+  </g>
+</svg>
