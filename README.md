@@ -13,6 +13,7 @@ Self-hosted, multi-tenant LLM gateway and prompt endpoint platform with training
 - [What It Does](#what-it-does)
 - [Architecture](#architecture)
 - [Quickstart (Local)](#quickstart-local)
+- [Add a New Provider Connector](#add-a-new-provider-connector)
 - [First End-to-End Run](#first-end-to-end-run)
 - [Public API](#public-api)
 - [Python SDK](#python-sdk)
@@ -92,6 +93,26 @@ Open:
 - Web UI: `http://localhost:8000/login`
 - Health: `http://localhost:8000/healthz`
 - Ready: `http://localhost:8000/readyz`
+
+## Add a New Provider Connector
+
+If you want to extend connectors, start here.
+
+Quick path:
+
+1. Create `providers/<provider_slug>/provider.yaml`
+2. Create `providers/<provider_slug>/services.yaml`
+3. Add model files under `providers/<provider_slug>/models/*.yaml`
+4. Wire runtime profile behavior in:
+   - `api/app/core/provider_profiles.py`
+   - `api/app/services/providers.py`
+   - `api/app/services/provider_validation.py`
+5. Run tests:
+   - `docker compose run --rm --build api python -m pytest -q`
+
+Detailed schema and examples:
+- `docs/provider-catalog.md`
+- `docs/developer-guide.md`
 
 ## First End-to-End Run
 
