@@ -1,112 +1,127 @@
 # flash-connector
 
-Self-hosted, multi-tenant Prompt Endpoint Platform + Training Data Store.
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Docker](https://img.shields.io/badge/docker-compose-blue.svg)](docker-compose.yml)
 
-`flash-connector` lets teams define prompt APIs, issue scoped virtual keys, run async/sync LLM jobs, store training events, and export datasets for fine-tuning.
+Self-hosted, multi-tenant LLM gateway and prompt endpoint platform with training data capture.
 
-## What You Get
+`flash-connector` lets you run your own prompt APIs, connect provider credentials per tenant, issue scoped virtual keys, run async/sync jobs, and export training datasets in JSONL.
 
-- Multi-tenant control plane with strict tenant-scoped data access.
-- API endpoints with immutable versions and explicit activation.
-- Virtual API keys (`x-api-key`) with endpoint scopes, rate limits, and quotas.
-- Async jobs (`submit -> job_id -> poll`) and sync responses (`single call`).
-- Provider-native batch runs (submit, poll, cancel).
-- Training event capture + feedback + JSONL export.
-- Few-shot curation from saved training events.
-- YAML-driven provider/model catalog so OSS users can add models/providers.
+## Table of Contents
 
-## Supported Runtime Providers (Current)
+- [What It Does](#what-it-does)
+- [Architecture](#architecture)
+- [Quickstart (Local)](#quickstart-local)
+- [First End-to-End Run](#first-end-to-end-run)
+- [Public API](#public-api)
+- [Python SDK](#python-sdk)
+- [Configuration](#configuration)
+- [Deployment Modes](#deployment-modes)
+- [Persistence and Backups](#persistence-and-backups)
+- [Multi-Tenancy](#multi-tenancy)
+- [Provider and Model Extension (YAML)](#provider-and-model-extension-yaml)
+- [Testing](#testing)
+- [Security Notes](#security-notes)
+- [Contributing](#contributing)
+- [License](#license)
 
+## What It Does
+
+- Multi-tenant control plane and API gateway.
+- Provider connections per tenant (BYOK and platform-managed modes).
+- Versioned prompt APIs (create versions, activate, test, run).
+- Virtual API keys (`x-api-key`) with scoped endpoint access.
+- Async jobs (`submit -> job_id -> poll`) and sync responses.
+- Provider-native batch jobs (submit, poll, cancel).
+- Training events + feedback + few-shot flags + JSONL export.
+- Provider/model registry via YAML for extensibility.
+
+Current built-in provider profiles:
 - OpenAI
-- Azure OpenAI (multiple endpoint profiles)
-- Azure AI Foundry (registry/runtime profile)
+- Azure OpenAI (multiple endpoint patterns)
+- Azure AI Foundry profile support
 
-Reference docs in repo:
-- `docs/provider-catalog.md`
-- `docs/developer-guide.md`
-- `docs/user-lifecycle.md`
+## Architecture
 
-## Run Modes
+```text
+Client / SDK / Curl
+        |
+        v
+   FastAPI API + Web UI
+        |
+   +----+-------------------+
+   |                        |
+PostgreSQL              Redis + RQ
+(metadata, config,      (queue)
+ jobs, training)
+                            |
+                            v
+                        Worker
+                            |
+                            v
+                    LLM Provider APIs
+```
 
-### 1) Standalone mode
+## Quickstart (Local)
 
-Runs everything locally with Docker:
-- Postgres
-- Redis
-- API
-- Worker
+### 1) Prerequisites
 
-Compose file: `docker-compose.yml`
+- Docker Engine + Docker Compose plugin
+- `bash`/`zsh`
 
-### 2) Microservice mode
-
-Runs only API + Worker, uses external DB/Redis.
-
-Compose file: `docker-compose.microservice.yml`
-
-Set in `.env`:
-- `DATABASE_URL`
-- `REDIS_URL`
-
-## 2-Minute Quickstart
+### 2) Initialize env and secrets
 
 ```bash
 cp .env.example .env
 ./scripts/flashctl init-local
+```
+
+`init-local` will:
+- generate required secrets if missing,
+- enable local login (`test` / `test`),
+- set a bootstrap API key for local development.
+
+### 3) Start stack
+
+```bash
 ./scripts/flashctl up
 ```
 
 Open:
-- `http://localhost:8000/login`
+- Web UI: `http://localhost:8000/login`
+- Health: `http://localhost:8000/healthz`
+- Ready: `http://localhost:8000/readyz`
 
-Local login (from `.env`):
-- `LOCAL_AUTH_USERNAME`
-- `LOCAL_AUTH_PASSWORD`
+## First End-to-End Run
 
-## Operator Helper (`flashctl`)
+1. Login at `/login`.
+2. Go to `Providers` and create a provider connection.
+3. Go to `APIs` and create an API endpoint.
+4. Create a version and activate it.
+5. Go to `API Keys`, create key scoped to that endpoint.
+6. Call API from curl/SDK.
+7. Save training signal and export JSONL.
 
-Use `scripts/flashctl` for reproducible local ops.
+## Public API
 
-Common commands:
-
-```bash
-./scripts/flashctl init          # create .env + generate required secrets
-./scripts/flashctl init-local    # enable local login + bootstrap key
-./scripts/flashctl up            # standalone mode (foreground)
-./scripts/flashctl up-bg         # standalone mode (detached)
-./scripts/flashctl up-micro      # microservice mode (foreground)
-./scripts/flashctl up-micro-bg   # microservice mode (detached)
-./scripts/flashctl health        # check /healthz and /readyz
-./scripts/flashctl down          # stop standalone stack
-./scripts/flashctl down-micro    # stop microservice stack
-```
-
-## First-Run Workflow (UI)
-
-1. Login.
-2. Go to **Providers** and create at least one ready provider connection.
-3. Go to **APIs**, create API, create version, activate it.
-4. Go to **API Keys**, create a key scoped to your API.
-5. Call public API from curl/SDK.
-6. Save training events and export JSONL.
-
-## Public API Quickstart
-
-### Async submit + poll
+### Submit async job
 
 ```bash
-# submit
 curl -s -X POST http://localhost:8000/v1/endpoints/$ENDPOINT_ID/jobs \
   -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{"input":"Say hello in one line","metadata":{"source":"smoke"}}'
+```
 
-# poll
+### Poll job
+
+```bash
 curl -s http://localhost:8000/v1/jobs/$JOB_ID \
   -H "x-api-key: $API_KEY"
 ```
 
-### Sync response (single call)
+### Inline response (single call)
 
 ```bash
 curl -s -X POST http://localhost:8000/v1/endpoints/$ENDPOINT_ID/responses \
@@ -121,20 +136,16 @@ curl -s -X POST http://localhost:8000/v1/endpoints/$ENDPOINT_ID/responses \
 curl -s -X POST http://localhost:8000/v1/jobs/$JOB_ID/save \
   -H "x-api-key: $API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"feedback":"thumb_up","tags":["gold"],"save_mode":"full"}'
+  -d '{"feedback":"thumb_up","tags":["gold"],"save_mode":"full","is_few_shot":true}'
 ```
 
-### Export training JSONL (session-auth admin API)
+### Batch APIs
 
-```bash
-curl -s -b cookies.txt -X POST http://localhost:8000/v1/training/export \
-  -H 'Content-Type: application/json' \
-  -d '{"endpoint_id":"'$ENDPOINT_ID'"}' > training.jsonl
-```
+- `POST /v1/endpoints/{endpoint_id}/batches`
+- `GET /v1/batches/{batch_id}`
+- `POST /v1/batches/{batch_id}/cancel`
 
 ## Python SDK
-
-Location: `sdk/`
 
 Install from repo root:
 
@@ -148,44 +159,71 @@ Example:
 from sdk import FlashConnectorClient
 
 with FlashConnectorClient(base_url="http://localhost:8000", api_key="fc_xxx") as client:
-    # sync
-    result = client.create_response("endpoint_id", input_text="Hello")
-    print(result.status, result.result_text)
-
-    # async
-    submission = client.submit_job("endpoint_id", input_text="Hello")
+    submission = client.submit_job(
+        "ep_123",
+        input_text="Say hello in one line",
+        metadata={"source": "sdk"},
+    )
     job = client.wait_for_job(submission.job_id)
-    print(job.status)
+    print(job.status, job.result_text)
 ```
 
-## Multi-Tenant Behavior
+See SDK docs in `sdk/README.md`.
 
-- Tenant isolation is enforced in DB queries and API access checks.
-- Hierarchical tenants are supported (parent -> child).
-- Query-param inheritance modes per tenant:
-  - `inherit`
-  - `merge`
-  - `override`
-- API keys are tenant-scoped and endpoint-scope aware.
+## Configuration
 
-Default OSS config is multi-tenant:
-- `SINGLE_TENANT_MODE=false`
+Start with `.env.example`.
 
-## Data Persistence and "DB Should Not Get Deleted"
+Required for any non-trivial deployment:
+- `SESSION_SECRET`
+- `API_KEY_HMAC_SECRET`
+- `TENANT_SECRET_ENCRYPTION_KEY`
 
-Standalone mode uses named Docker volumes:
+Important runtime toggles:
+- `RUNTIME_MODE=sandbox|production`
+- `LOCAL_AUTH_ENABLED=true|false`
+- `SINGLE_TENANT_MODE=false` (recommended for OSS usage)
+
+Production expectations:
+- `RUNTIME_MODE=production`
+- `SESSION_COOKIE_SECURE=true`
+- `LOCAL_AUTH_ENABLED=false`
+- `LOCAL_BOOTSTRAP_API_KEY` unset
+- OIDC configured
+- strict `CORS_ORIGINS` (no `*`)
+
+## Deployment Modes
+
+### Standalone (local full stack)
+
+Uses `docker-compose.yml`:
+- postgres
+- redis
+- api
+- worker
+
+### Microservice (external DB/Redis)
+
+Uses `docker-compose.microservice.yml`:
+- api
+- worker
+
+Set external:
+- `DATABASE_URL`
+- `REDIS_URL`
+
+## Persistence and Backups
+
+Named volumes used by default:
 - `postgres_data`
 - `tenant_secrets`
 
-These survive container restarts and `docker compose down`.
-
-Safe commands:
-- `docker compose stop`
-- `docker compose down`
+Safe lifecycle commands:
+- `docker compose down` (keeps volumes)
 - `docker compose up -d`
 
 Destructive command:
-- `docker compose down -v` (deletes Postgres + secrets volumes)
+- `docker compose down -v` (deletes data volumes)
 
 Backup example:
 
@@ -201,17 +239,24 @@ docker compose exec -T postgres \
   psql -U ${POSTGRES_USER:-flash} -d ${POSTGRES_DB:-flash_connector} < backup.sql
 ```
 
-## Extending the Provider/Model Catalog (OSS)
+## Multi-Tenancy
 
-The platform is registry-driven from `providers/`.
+- Tenant isolation is enforced at query and access layers.
+- API keys are tenant-scoped and endpoint-scope aware.
+- Tenant hierarchy is supported (parent/child).
+- Sub-tenant attribution code can be passed on requests for billing/reporting segmentation.
 
-### A) Add a new model under an existing provider
+## Provider and Model Extension (YAML)
 
-1. Create file: `providers/<provider_slug>/models/<model-id>.yaml`
-2. Define capabilities + parameter schema.
-3. Add model id to `recommended_models` in `providers/<provider_slug>/provider.yaml` (optional but recommended).
+Provider catalog is loaded from `providers/`.
 
-Minimal model YAML example:
+### Add model to existing provider
+
+1. Create `providers/<provider_slug>/models/<model-id>.yaml`
+2. Define capability + parameter schema
+3. Add to `recommended_models` in `providers/<provider_slug>/provider.yaml` (optional)
+
+Example:
 
 ```yaml
 model: gpt-foo-mini
@@ -236,95 +281,48 @@ parameters:
     description: Sampling temperature.
 ```
 
-### B) Add an entirely new provider
+### Add new provider profile
 
-1. Create folder: `providers/<new_provider_slug>/`
-2. Add:
+1. Create `providers/<provider_slug>/` with:
    - `provider.yaml`
    - `services.yaml`
    - `models/*.yaml`
-3. Wire runtime profile and validation paths:
+2. Add runtime profile wiring in:
    - `api/app/core/provider_profiles.py`
    - `api/app/services/providers.py`
    - `api/app/services/provider_validation.py`
 
-### Validate catalog changes
-
-```bash
-docker compose run --rm --build api \
-  pytest -q tests/test_provider_registry_schema.py tests/test_provider_catalog.py tests/test_provider_validation.py
-```
-
-## Security Basics
-
-- Virtual keys are hashed (not stored in plaintext).
-- Tenant provider keys are encrypted at rest in secrets storage.
-- Session auth uses secure cookie settings (`HTTPOnly`, `SameSite=Lax`, configurable `Secure`).
-- CSRF protection is enforced for session-authenticated unsafe methods.
-- Provider upstream keys are not persisted in normal relational tables.
-
-## Environment Configuration
-
-Start from `.env.example`.
-
-Minimum required:
-- `SESSION_SECRET`
-- `API_KEY_HMAC_SECRET`
-- `TENANT_SECRET_ENCRYPTION_KEY`
-
-Local dev convenience:
-- `LOCAL_AUTH_ENABLED=true`
-- `LOCAL_AUTH_USERNAME=test`
-- `LOCAL_AUTH_PASSWORD=test`
-
-Production hardening:
-- `RUNTIME_MODE=production`
-- `ENVIRONMENT=production`
-- `SESSION_COOKIE_SECURE=true`
-- `LOCAL_AUTH_ENABLED=false`
-- `LOCAL_BOOTSTRAP_API_KEY=` (empty)
-- no wildcard CORS
-
-## Repository Layout
-
-- `api/` FastAPI app + server-rendered UI
-- `worker/` RQ worker
-- `migrations/` Alembic migrations
-- `providers/` provider/model/service YAML registry
-- `sdk/` Python SDK
-- `tests/` automated tests
-- `scripts/flashctl` operator helper
-- `docker-compose.yml` standalone stack
-- `docker-compose.microservice.yml` API/worker only
-
-## Deployment (DigitalOcean / Any VM)
-
-1. Provision VM.
-2. Install Docker + Docker Compose plugin.
-3. Clone repo.
-4. Configure `.env` with production secrets and DB/Redis URLs.
-5. Run:
-
-```bash
-docker compose up -d --build
-```
-
-6. Put reverse proxy (Nginx/Caddy) in front of `:8000` with TLS.
-7. Schedule Postgres backups.
-
 ## Testing
+
+Run all tests:
 
 ```bash
 docker compose run --rm --build api python -m pytest -q
 ```
 
-## Git/Repo Strategy (Landing vs Product)
+Suggested checks before merging:
+- tests pass
+- provider registry tests pass
+- at least one real provider connection validation succeeds
+- basic API smoke (`submit`, `poll`, `save`) succeeds
 
-Recommended split:
-- `flash-connector` -> runtime/API/worker/SDK (this repo)
-- `flash-connector-site` -> landing/marketing/docs website
+## Security Notes
 
-Keep release cadence independent. Landing repo should link to tagged product releases.
+- Virtual API keys are hashed, not stored plaintext.
+- Tenant provider secrets are encrypted at rest.
+- Session auth uses secure cookie controls.
+- CSRF checks are enforced for session-auth unsafe methods.
+- Use `RUNTIME_MODE=production` before internet-facing deploys.
+
+## Contributing
+
+If you plan to accept OSS PRs, keep this workflow:
+
+1. Open issue describing problem/change.
+2. Keep PRs small and focused.
+3. Add/adjust tests for behavior changes.
+4. Update README and provider YAML docs for user-facing changes.
+5. Keep backward compatibility for public API paths under `/v1/*` where possible.
 
 ## License
 
